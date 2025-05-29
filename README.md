@@ -132,7 +132,9 @@ Para adicionar um novo indicador:
 2. Adicione o código e nome da série em `src/utils/configuracao.py` na seção `CONFIGURACAO_EXTRACAO`
 3. Configure a visualização do indicador na seção `CONFIGURACAO_VISUALIZACAO`
 
-## TCC MBA em Gestão Analítica com BI e Big Data
+### TCC MBA em Gestão Analítica com BI e Big Data
 
-Autor: Márcio José Lemos Garcia
-Orientador: Professor Ms.Thiago Bluhm
+Universidade de Fortaleza - UNIFOR
+
+- Autor: Márcio José Lemos Garcia
+- Orientador: Professor Ms.Thiago Bluhm
