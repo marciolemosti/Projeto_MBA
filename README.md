@@ -2,11 +2,11 @@
 
 Dashboard interativo com indicadores econômicos chave do Brasil, incluindo previsões de déficit primário e arrecadação de IOF.
 
-![Banner do Projeto](assets/banner.png)
+![Banner do Projeto](assets/banner 2.png)
 
 ## Sobre o Projeto
 
-O Termômetro da Economia Brasileira é um dashboard interativo que apresenta indicadores econômicos chave do Brasil, com foco especial em déficit primário e arrecadação de IOF. O sistema extrai dados automaticamente do Banco Central do Brasil (BCB), processa séries temporais e gera previsões utilizando modelos estatísticos avançados.
+O Termômetro da Economia Brasileira é um dashboard interativo que apresenta indicadores econômicos chave do Brasil, com foco especial em déficit primário e arrecadação de IOF. O sistema extrai dados automaticamente do Banco Central do Brasil (BCB) e do Instituto Brasileiro de Geografia e Estatística (IBGE), processa séries temporais e gera previsões utilizando modelos estatísticos avançados.
 
 ### Principais Funcionalidades
 
@@ -132,20 +132,7 @@ Para adicionar um novo indicador:
 2. Adicione o código e nome da série em `src/utils/configuracao.py` na seção `CONFIGURACAO_EXTRACAO`
 3. Configure a visualização do indicador na seção `CONFIGURACAO_VISUALIZACAO`
 
-## Contribuição
+## TCC MBA em Gestão Analítica com BI e Big Data
 
-Contribuições são bem-vindas! Para contribuir:
-
-1. Faça um fork do projeto
-2. Crie uma branch para sua feature (`git checkout -b feature/nova-funcionalidade`)
-3. Commit suas mudanças (`git commit -m 'Adiciona nova funcionalidade'`)
-4. Push para a branch (`git push origin feature/nova-funcionalidade`)
-5. Abra um Pull Request
-
-## Licença
-
-Este projeto está licenciado sob a licença MIT - veja o arquivo LICENSE para detalhes.
-
-## Contato
-
-Para dúvidas ou sugestões, entre em contato através das issues do GitHub.
+Autor: Márcio José Lemos Garcia
+Orientador: Professor Ms.Thiago Bluhm
