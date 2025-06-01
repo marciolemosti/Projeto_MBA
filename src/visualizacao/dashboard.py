@@ -300,6 +300,201 @@ def detectar_eventos_indicadores(dados_indicadores: Dict[str, pd.DataFrame]) -> 
     
     return eventos
 
+# Função para exibir projeções com tratamento robusto de colunas
+def exibir_projecoes_corrigido(id_indicador_prev, projecoes_indicadores, dados_filtrados, config_indicadores):
+    """
+    Exibe projeções para um indicador com tratamento robusto de colunas.
+    
+    Args:
+        id_indicador_prev: ID do indicador para projeção
+        projecoes_indicadores: Dicionário com DataFrames de projeções
+        dados_filtrados: Dicionário com DataFrames de dados históricos
+        config_indicadores: Configuração dos indicadores
+    """
+    # Verificar se há projeções para o indicador selecionado
+    if id_indicador_prev in projecoes_indicadores and not projecoes_indicadores[id_indicador_prev].empty:
+        # Obter configuração do indicador
+        config_ind = config_indicadores[id_indicador_prev]
+        
+        # Exibir gráfico de projeção
+        st.subheader(f"Projeção de {config_ind['nome']} para os próximos 2 anos")
+        
+        # Obter DataFrames
+        df_historico = dados_filtrados[id_indicador_prev].copy() if id_indicador_prev in dados_filtrados else pd.DataFrame()
+        df_projecao = projecoes_indicadores[id_indicador_prev].copy()
+        
+        # Verificar e mapear colunas do DataFrame de projeção
+        colunas_data = ['ds', 'data']  # Possíveis nomes para coluna de data
+        colunas_valor = ['yhat', 'valor', 'projecao']  # Possíveis nomes para coluna de valor
+        colunas_limite_inf = ['yhat_lower', 'limite_inferior']  # Possíveis nomes para limite inferior
+        colunas_limite_sup = ['yhat_upper', 'limite_superior']  # Possíveis nomes para limite superior
+        
+        # Encontrar coluna de data
+        coluna_data_proj = None
+        for col in colunas_data:
+            if col in df_projecao.columns:
+                coluna_data_proj = col
+                break
+        
+        # Encontrar coluna de valor
+        coluna_valor_proj = None
+        for col in colunas_valor:
+            if col in df_projecao.columns:
+                coluna_valor_proj = col
+                break
+        
+        # Encontrar coluna de limite inferior
+        coluna_limite_inf = None
+        for col in colunas_limite_inf:
+            if col in df_projecao.columns:
+                coluna_limite_inf = col
+                break
+        
+        # Encontrar coluna de limite superior
+        coluna_limite_sup = None
+        for col in colunas_limite_sup:
+            if col in df_projecao.columns:
+                coluna_limite_sup = col
+                break
+        
+        # Verificar se encontrou as colunas necessárias
+        if not coluna_data_proj or not coluna_valor_proj:
+            st.warning(f"Formato de dados de projeção incompatível. Colunas disponíveis: {', '.join(df_projecao.columns)}")
+            return
+        
+        # Determinar colunas de valor no histórico
+        coluna_valor_hist = None
+        if not df_historico.empty:
+            if 'valor' in df_historico.columns:
+                coluna_valor_hist = 'valor'
+            elif 'deficit' in df_historico.columns:
+                coluna_valor_hist = 'deficit'
+            elif 'iof' in df_historico.columns:
+                coluna_valor_hist = 'iof'
+            else:
+                # Encontrar a primeira coluna numérica que não seja 'data'
+                colunas_numericas = [col for col in df_historico.columns if col != 'data' and pd.api.types.is_numeric_dtype(df_historico[col])]
+                if colunas_numericas:
+                    coluna_valor_hist = colunas_numericas[0]
+        
+        # Criar figura
+        fig = go.Figure()
+        
+        # Adicionar dados históricos
+        if not df_historico.empty and coluna_valor_hist:
+            fig.add_trace(go.Scatter(
+                x=df_historico['data'],
+                y=df_historico[coluna_valor_hist],
+                name="Dados Históricos",
+                line=dict(color=config_ind['cor'])
+            ))
+        
+        # Adicionar projeção
+        fig.add_trace(go.Scatter(
+            x=df_projecao[coluna_data_proj],
+            y=df_projecao[coluna_valor_proj],
+            name="Projeção",
+            line=dict(color='rgba(0, 0, 255, 0.8)', dash='dash')
+        ))
+        
+        # Adicionar intervalo de confiança se disponível
+        if coluna_limite_inf and coluna_limite_sup:
+            fig.add_trace(go.Scatter(
+                x=df_projecao[coluna_data_proj].tolist() + df_projecao[coluna_data_proj].tolist()[::-1],
+                y=df_projecao[coluna_limite_sup].tolist() + df_projecao[coluna_limite_inf].tolist()[::-1],
+                fill='toself',
+                fillcolor='rgba(0, 0, 255, 0.1)',
+                line=dict(color='rgba(255, 255, 255, 0)'),
+                name="Intervalo de Confiança (95%)"
+            ))
+        
+        # Configurar layout
+        fig.update_layout(
+            title=f"Projeção de {config_ind['nome']} para os próximos 2 anos",
+            xaxis=dict(title="Data"),
+            yaxis=dict(title=f"{config_ind['nome']} ({config_ind['unidade']})"),
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=1.02,
+                xanchor="right",
+                x=1
+            )
+        )
+        
+        # Exibir gráfico
+        st.plotly_chart(fig, use_container_width=True)
+        
+        # Exibir tabela de projeções
+        st.subheader("Valores Projetados")
+        
+        try:
+            # Criar tabela de projeções
+            colunas_tabela = [coluna_data_proj, coluna_valor_proj]
+            if coluna_limite_inf:
+                colunas_tabela.append(coluna_limite_inf)
+            if coluna_limite_sup:
+                colunas_tabela.append(coluna_limite_sup)
+            
+            df_tabela = df_projecao[colunas_tabela].copy()
+            
+            # Renomear colunas para exibição
+            mapeamento_colunas = {
+                coluna_data_proj: 'Data',
+                coluna_valor_proj: 'Projeção'
+            }
+            
+            if coluna_limite_inf:
+                mapeamento_colunas[coluna_limite_inf] = 'Limite Inferior'
+            
+            if coluna_limite_sup:
+                mapeamento_colunas[coluna_limite_sup] = 'Limite Superior'
+            
+            df_tabela = df_tabela.rename(columns=mapeamento_colunas)
+            
+            # Formatar valores
+            for col in ['Projeção', 'Limite Inferior', 'Limite Superior']:
+                if col in df_tabela.columns:
+                    df_tabela[col] = df_tabela[col].apply(
+                        lambda x: config_ind['formato'].format(x) if pd.notnull(x) else 'N/A'
+                    )
+            
+            # Formatar datas
+            if 'Data' in df_tabela.columns and pd.api.types.is_datetime64_any_dtype(df_tabela['Data']):
+                df_tabela['Data'] = df_tabela['Data'].dt.strftime('%d/%m/%Y')
+            
+            # Ordenar por data (mais próxima primeiro)
+            df_tabela = df_tabela.sort_values('Data')
+            
+            # Exibir tabela
+            st.dataframe(df_tabela, use_container_width=True)
+        except Exception as e:
+            logger.error(f"Erro ao exibir tabela de projeções: {str(e)}")
+            st.warning("Não foi possível exibir a tabela de projeções devido a um erro no formato dos dados.")
+        
+        # Exibir informações sobre a metodologia
+        with st.expander("Sobre a Metodologia de Projeção"):
+            st.markdown("""
+            ### Metodologia de Projeção
+            
+            As projeções são geradas utilizando o modelo Prophet, desenvolvido pelo Facebook Research. Este modelo é especialmente adequado para séries temporais com forte sazonalidade e tendências não-lineares.
+            
+            **Características do modelo:**
+            - Decomposição da série em tendência, sazonalidade e componente de feriados
+            - Detecção automática de mudanças na tendência
+            - Tratamento robusto de outliers
+            - Intervalos de confiança para quantificar a incerteza
+            
+            **Limitações:**
+            - As projeções são baseadas apenas no comportamento histórico da série
+            - Eventos externos não capturados nos dados históricos não são considerados
+            - A precisão diminui à medida que o horizonte de previsão aumenta
+            
+            Para mais informações, consulte a [documentação do Prophet](https://facebook.github.io/prophet/).
+            """)
+    else:
+        st.info(f"Não foi possível gerar projeções para {config_indicadores[id_indicador_prev]['nome']}. Verifique se há dados históricos suficientes.")
+
 # Função principal
 def main():
     """Função principal do dashboard."""
@@ -918,124 +1113,8 @@ def main():
                 key="prev_ind"
             )
             
-            # Verificar se há projeções para o indicador selecionado
-            if id_indicador_prev in projecoes_indicadores and not projecoes_indicadores[id_indicador_prev].empty:
-                # Obter configuração do indicador
-                config_ind = config_indicadores[id_indicador_prev]
-                
-                # Exibir gráfico de projeção
-                st.subheader(f"Projeção de {config_ind['nome']} para os próximos 2 anos")
-                
-                # Obter DataFrames
-                df_historico = dados_filtrados[id_indicador_prev].copy() if id_indicador_prev in dados_filtrados else pd.DataFrame()
-                df_projecao = projecoes_indicadores[id_indicador_prev].copy()
-                
-                # Determinar colunas de valor
-                coluna_valor_hist = None
-                if not df_historico.empty:
-                    if 'valor' in df_historico.columns:
-                        coluna_valor_hist = 'valor'
-                    elif 'deficit' in df_historico.columns:
-                        coluna_valor_hist = 'deficit'
-                    elif 'iof' in df_historico.columns:
-                        coluna_valor_hist = 'iof'
-                    else:
-                        # Encontrar a primeira coluna numérica que não seja 'data'
-                        colunas_numericas = [col for col in df_historico.columns if col != 'data' and pd.api.types.is_numeric_dtype(df_historico[col])]
-                        if colunas_numericas:
-                            coluna_valor_hist = colunas_numericas[0]
-                
-                # Criar figura
-                fig = go.Figure()
-                
-                # Adicionar dados históricos
-                if not df_historico.empty and coluna_valor_hist:
-                    fig.add_trace(go.Scatter(
-                        x=df_historico['data'],
-                        y=df_historico[coluna_valor_hist],
-                        name="Dados Históricos",
-                        line=dict(color=config_ind['cor'])
-                    ))
-                
-                # Adicionar projeção
-                fig.add_trace(go.Scatter(
-                    x=df_projecao['ds'],
-                    y=df_projecao['yhat'],
-                    name="Projeção",
-                    line=dict(color='rgba(0, 0, 255, 0.8)', dash='dash')
-                ))
-                
-                # Adicionar intervalo de confiança
-                fig.add_trace(go.Scatter(
-                    x=df_projecao['ds'].tolist() + df_projecao['ds'].tolist()[::-1],
-                    y=df_projecao['yhat_upper'].tolist() + df_projecao['yhat_lower'].tolist()[::-1],
-                    fill='toself',
-                    fillcolor='rgba(0, 0, 255, 0.1)',
-                    line=dict(color='rgba(255, 255, 255, 0)'),
-                    name="Intervalo de Confiança (95%)"
-                ))
-                
-                # Configurar layout
-                fig.update_layout(
-                    title=f"Projeção de {config_ind['nome']} para os próximos 2 anos",
-                    xaxis=dict(title="Data"),
-                    yaxis=dict(title=f"{config_ind['nome']} ({config_ind['unidade']})"),
-                    legend=dict(
-                        orientation="h",
-                        yanchor="bottom",
-                        y=1.02,
-                        xanchor="right",
-                        x=1
-                    )
-                )
-                
-                # Exibir gráfico
-                st.plotly_chart(fig, use_container_width=True)
-                
-                # Exibir tabela de projeções
-                st.subheader("Valores Projetados")
-                
-                # Criar tabela de projeções
-                df_tabela = df_projecao[['ds', 'yhat', 'yhat_lower', 'yhat_upper']].copy()
-                df_tabela.columns = ['Data', 'Projeção', 'Limite Inferior', 'Limite Superior']
-                
-                # Formatar valores
-                for col in ['Projeção', 'Limite Inferior', 'Limite Superior']:
-                    df_tabela[col] = df_tabela[col].apply(
-                        lambda x: config_ind['formato'].format(x)
-                    )
-                
-                # Formatar datas
-                df_tabela['Data'] = df_tabela['Data'].dt.strftime('%d/%m/%Y')
-                
-                # Ordenar por data (mais próxima primeiro)
-                df_tabela = df_tabela.sort_values('Data')
-                
-                # Exibir tabela
-                st.dataframe(df_tabela, use_container_width=True)
-                
-                # Exibir informações sobre a metodologia
-                with st.expander("Sobre a Metodologia de Projeção"):
-                    st.markdown("""
-                    ### Metodologia de Projeção
-                    
-                    As projeções são geradas utilizando o modelo Prophet, desenvolvido pelo Facebook Research. Este modelo é especialmente adequado para séries temporais com forte sazonalidade e tendências não-lineares.
-                    
-                    **Características do modelo:**
-                    - Decomposição da série em tendência, sazonalidade e componente de feriados
-                    - Detecção automática de mudanças na tendência
-                    - Tratamento robusto de outliers
-                    - Intervalos de confiança para quantificar a incerteza
-                    
-                    **Limitações:**
-                    - As projeções são baseadas apenas no comportamento histórico da série
-                    - Eventos externos não capturados nos dados históricos não são considerados
-                    - A precisão diminui à medida que o horizonte de previsão aumenta
-                    
-                    Para mais informações, consulte a [documentação do Prophet](https://facebook.github.io/prophet/).
-                    """)
-            else:
-                st.info(f"Não foi possível gerar projeções para {config_indicadores[id_indicador_prev]['nome']}. Verifique se há dados históricos suficientes.")
+            # Usar a função corrigida para exibir projeções
+            exibir_projecoes_corrigido(id_indicador_prev, projecoes_indicadores, dados_filtrados, config_indicadores)
     
     # Aba de Exportação
     with tab_exportar:
@@ -1081,27 +1160,60 @@ def main():
                     if incluir_projecoes and id_indicador_exp in projecoes_indicadores:
                         df_proj = projecoes_indicadores[id_indicador_exp].copy()
                         
-                        # Renomear colunas para padronização
-                        df_proj = df_proj.rename(columns={
-                            'ds': 'data',
-                            'yhat': 'projecao',
-                            'yhat_lower': 'limite_inferior',
-                            'yhat_upper': 'limite_superior'
-                        })
+                        # Verificar e mapear colunas do DataFrame de projeção
+                        colunas_data = ['ds', 'data']  # Possíveis nomes para coluna de data
+                        colunas_valor = ['yhat', 'valor', 'projecao']  # Possíveis nomes para coluna de valor
+                        colunas_limite_inf = ['yhat_lower', 'limite_inferior']  # Possíveis nomes para limite inferior
+                        colunas_limite_sup = ['yhat_upper', 'limite_superior']  # Possíveis nomes para limite superior
                         
-                        # Adicionar coluna de tipo
-                        df_exp['tipo'] = 'historico'
-                        df_proj['tipo'] = 'projecao'
+                        # Encontrar coluna de data
+                        coluna_data_proj = None
+                        for col in colunas_data:
+                            if col in df_proj.columns:
+                                coluna_data_proj = col
+                                break
                         
-                        # Selecionar colunas relevantes
-                        colunas_valor = [col for col in df_exp.columns if col not in ['data', 'tipo']]
-                        
-                        # Adicionar colunas de valor às projeções
+                        # Encontrar coluna de valor
+                        coluna_valor_proj = None
                         for col in colunas_valor:
-                            df_proj[col] = None
+                            if col in df_proj.columns:
+                                coluna_valor_proj = col
+                                break
                         
-                        # Concatenar DataFrames
-                        df_exp = pd.concat([df_exp, df_proj], ignore_index=True)
+                        if coluna_data_proj and coluna_valor_proj:
+                            # Renomear colunas para padronização
+                            mapeamento_colunas = {coluna_data_proj: 'data', coluna_valor_proj: 'projecao'}
+                            
+                            # Adicionar mapeamento para limites se existirem
+                            for col in colunas_limite_inf:
+                                if col in df_proj.columns:
+                                    mapeamento_colunas[col] = 'limite_inferior'
+                                    break
+                            
+                            for col in colunas_limite_sup:
+                                if col in df_proj.columns:
+                                    mapeamento_colunas[col] = 'limite_superior'
+                                    break
+                            
+                            # Renomear colunas
+                            df_proj = df_proj.rename(columns=mapeamento_colunas)
+                            
+                            # Adicionar coluna de tipo
+                            df_exp['tipo'] = 'historico'
+                            df_proj['tipo'] = 'projecao'
+                            
+                            # Selecionar colunas relevantes
+                            colunas_valor = [col for col in df_exp.columns if col not in ['data', 'tipo']]
+                            
+                            # Adicionar colunas de valor às projeções
+                            for col in colunas_valor:
+                                if col not in df_proj.columns:
+                                    df_proj[col] = None
+                            
+                            # Concatenar DataFrames
+                            df_exp = pd.concat([df_exp, df_proj], ignore_index=True)
+                        else:
+                            st.warning("Não foi possível incluir projeções devido a incompatibilidade de formato")
                     
                     # Exportar conforme formato selecionado
                     nome_arquivo = f"{id_indicador_exp}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
