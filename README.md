@@ -2,7 +2,7 @@
 
 Dashboard interativo com indicadores econômicos chave do Brasil, incluindo previsões de déficit primário e arrecadação de IOF.
 
-![Banner do Projeto](assets/banner 2.png)
+![Banner do Projeto](assets/banner2.png)
 
 ## Sobre o Projeto
 
