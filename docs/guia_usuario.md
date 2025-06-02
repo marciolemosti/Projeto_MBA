@@ -41,8 +41,8 @@ O Dashboard de Indicadores Socioeconômicos Brasileiros é uma aplicação inter
 
 1. Clone o repositório:
 ```bash
-git clone https://github.com/seu-usuario/termometro-economia.git
-cd termometro-economia
+git clone https://github.com/marciolemosti/Projeto_MBA.git
+cd Projeto_MBA
 ```
 
 2. Instale as dependências:
@@ -244,24 +244,8 @@ docker-compose up
 - Verifique as permissões do repositório em Settings > Actions > General.
 - Certifique-se de que a opção "Read and write permissions" está selecionada.
 
-## Contribuição
+## UNIVERSIDADE DE FORTALEZA - UNIFOR
+- Curso de MBA em Gestão analítica com BI e Big Data
+- Autor: Márcio Lemos
+- Orientador: Prof. Ms. Thiago Bluhm
 
-Contribuições são bem-vindas! Para contribuir:
-
-1. Faça fork do repositório.
-2. Crie uma branch para sua feature (`git checkout -b feature/nova-funcionalidade`).
-3. Faça commit das suas alterações (`git commit -m 'Adiciona nova funcionalidade'`).
-4. Faça push para a branch (`git push origin feature/nova-funcionalidade`).
-5. Abra um Pull Request.
-
-## Licença
-
-Este projeto está licenciado sob a licença MIT - veja o arquivo LICENSE para detalhes.
-
-## Contato
-
-Para dúvidas, sugestões ou problemas, abra uma issue no repositório do GitHub.
-
----
-
-Desenvolvido com ❤️ para análise de indicadores econômicos brasileiros.
