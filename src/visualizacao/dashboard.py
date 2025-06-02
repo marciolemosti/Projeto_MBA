@@ -337,10 +337,33 @@ def detectar_eventos_indicadores(dados_indicadores: Dict[str, pd.DataFrame]) -> 
     
     return eventos
 
-# Função para obter coluna de valor em um DataFrame
-def obter_coluna_valor(df: pd.DataFrame) -> Optional[str]:
+# Função para verificar se um DataFrame é válido e tem as colunas necessárias
+def verificar_dataframe(df: Optional[pd.DataFrame], colunas_necessarias: List[str] = None) -> bool:
     """
-    Determina a coluna de valor em um DataFrame.
+    Verifica se um DataFrame é válido e contém as colunas necessárias.
+    
+    Args:
+        df: DataFrame a ser verificado
+        colunas_necessarias: Lista de colunas que devem estar presentes
+        
+    Returns:
+        True se o DataFrame for válido e contiver as colunas necessárias, False caso contrário
+    """
+    # Verificar se o DataFrame existe e não está vazio
+    if df is None or df.empty:
+        return False
+    
+    # Se não houver colunas específicas para verificar, considerar válido
+    if not colunas_necessarias:
+        return True
+    
+    # Verificar se todas as colunas necessárias estão presentes
+    return all(coluna in df.columns for coluna in colunas_necessarias)
+
+# Função para obter coluna de valor em um DataFrame com tratamento ultra-robusto
+def obter_coluna_valor(df: Optional[pd.DataFrame]) -> Optional[str]:
+    """
+    Determina a coluna de valor em um DataFrame com tratamento ultra-robusto de erros.
     
     Args:
         df: DataFrame a ser analisado
@@ -348,28 +371,81 @@ def obter_coluna_valor(df: pd.DataFrame) -> Optional[str]:
     Returns:
         Nome da coluna de valor ou None se não encontrada
     """
-    if df.empty:
+    # Verificar se o DataFrame existe e não está vazio
+    if df is None or df.empty:
         return None
     
-    # Lista de possíveis nomes de colunas de valor em ordem de prioridade
-    colunas_possiveis = ['valor', 'deficit', 'iof', 'yhat', 'projecao']
-    
-    # Verificar cada coluna possível
-    for coluna in colunas_possiveis:
-        if coluna in df.columns:
-            return coluna
-    
-    # Se nenhuma das colunas específicas for encontrada, procurar qualquer coluna numérica que não seja 'data'
-    colunas_numericas = [col for col in df.columns if col != 'data' and pd.api.types.is_numeric_dtype(df[col])]
-    if colunas_numericas:
-        return colunas_numericas[0]
+    try:
+        # Lista de possíveis nomes de colunas de valor em ordem de prioridade
+        colunas_possiveis = ['valor', 'deficit', 'iof', 'yhat', 'projecao']
+        
+        # Verificar cada coluna possível
+        for coluna in colunas_possiveis:
+            if coluna in df.columns:
+                return coluna
+        
+        # Se nenhuma das colunas específicas for encontrada, procurar qualquer coluna numérica que não seja 'data'
+        colunas_numericas = []
+        for col in df.columns:
+            if col != 'data':
+                try:
+                    # Verificar se a coluna é numérica
+                    if pd.api.types.is_numeric_dtype(df[col]):
+                        colunas_numericas.append(col)
+                except:
+                    # Ignorar erros ao verificar o tipo da coluna
+                    pass
+        
+        if colunas_numericas:
+            return colunas_numericas[0]
+    except Exception as e:
+        logger.error(f"Erro ao determinar coluna de valor: {str(e)}")
     
     return None
 
-# Função para exibir projeções com tratamento robusto de colunas
+# Função para obter valor seguro de um DataFrame
+def obter_valor_seguro(df: Optional[pd.DataFrame], coluna: str, indice: int = -1, valor_padrao: Any = None) -> Any:
+    """
+    Obtém um valor de um DataFrame de forma segura, com tratamento de erros.
+    
+    Args:
+        df: DataFrame de origem
+        coluna: Nome da coluna
+        indice: Índice da linha (padrão: -1, última linha)
+        valor_padrao: Valor a retornar em caso de erro
+        
+    Returns:
+        Valor obtido ou valor_padrao em caso de erro
+    """
+    try:
+        # Verificar se o DataFrame existe e não está vazio
+        if df is None or df.empty:
+            return valor_padrao
+        
+        # Verificar se a coluna existe
+        if coluna not in df.columns:
+            return valor_padrao
+        
+        # Verificar se o índice é válido
+        if indice >= len(df) or indice < -len(df):
+            return valor_padrao
+        
+        # Obter o valor
+        valor = df.iloc[indice][coluna]
+        
+        # Verificar se o valor é válido
+        if pd.isna(valor):
+            return valor_padrao
+        
+        return valor
+    except Exception as e:
+        logger.error(f"Erro ao obter valor seguro: {str(e)}")
+        return valor_padrao
+
+# Função para exibir projeções com tratamento ultra-robusto de erros
 def exibir_projecoes_robusta(id_indicador_prev, projecoes_indicadores, dados_filtrados, config_indicadores):
     """
-    Exibe projeções para um indicador com tratamento robusto de colunas.
+    Exibe projeções para um indicador com tratamento ultra-robusto de erros.
     
     Args:
         id_indicador_prev: ID do indicador para projeção
@@ -378,20 +454,30 @@ def exibir_projecoes_robusta(id_indicador_prev, projecoes_indicadores, dados_fil
         config_indicadores: Configuração dos indicadores
     """
     try:
-        # Verificar se há projeções para o indicador selecionado
-        if id_indicador_prev not in projecoes_indicadores or projecoes_indicadores[id_indicador_prev].empty:
-            st.info(f"Não foi possível gerar projeções para {config_indicadores[id_indicador_prev]['nome']}. Verifique se há dados históricos suficientes.")
+        # Verificar se o indicador existe na configuração
+        if id_indicador_prev not in config_indicadores:
+            st.info("Indicador não encontrado na configuração.")
             return
         
         # Obter configuração do indicador
         config_ind = config_indicadores[id_indicador_prev]
         
+        # Verificar se há projeções para o indicador selecionado
+        if id_indicador_prev not in projecoes_indicadores or projecoes_indicadores[id_indicador_prev] is None or projecoes_indicadores[id_indicador_prev].empty:
+            st.info(f"Não foi possível gerar projeções para {config_ind['nome']}. Verifique se há dados históricos suficientes.")
+            return
+        
         # Exibir gráfico de projeção
         st.subheader(f"Projeção de {config_ind['nome']} para os próximos 2 anos")
         
-        # Obter DataFrames
-        df_historico = dados_filtrados[id_indicador_prev].copy() if id_indicador_prev in dados_filtrados else pd.DataFrame()
-        df_projecao = projecoes_indicadores[id_indicador_prev].copy()
+        # Obter DataFrames com tratamento seguro
+        df_historico = dados_filtrados.get(id_indicador_prev, pd.DataFrame()).copy() if id_indicador_prev in dados_filtrados else pd.DataFrame()
+        df_projecao = projecoes_indicadores.get(id_indicador_prev, pd.DataFrame()).copy() if id_indicador_prev in projecoes_indicadores else pd.DataFrame()
+        
+        # Verificar se os DataFrames são válidos
+        if df_projecao.empty:
+            st.warning("Não há dados de projeção disponíveis para este indicador.")
+            return
         
         # Verificar e mapear colunas do DataFrame de projeção
         colunas_data = ['ds', 'data']  # Possíveis nomes para coluna de data
@@ -429,8 +515,29 @@ def exibir_projecoes_robusta(id_indicador_prev, projecoes_indicadores, dados_fil
         
         # Verificar se encontrou as colunas necessárias
         if not coluna_data_proj or not coluna_valor_proj:
-            st.warning(f"Formato de dados de projeção incompatível. Colunas disponíveis: {', '.join(df_projecao.columns)}")
-            return
+            # Tentar criar colunas padrão se não encontrou
+            if not coluna_data_proj and 'data' not in df_projecao.columns and len(df_projecao) > 0:
+                # Criar coluna de data artificial
+                datas = [datetime.now() + timedelta(days=i*30) for i in range(len(df_projecao))]
+                df_projecao['data'] = datas
+                coluna_data_proj = 'data'
+                st.info("Criada coluna de data artificial para projeções.")
+            
+            if not coluna_valor_proj:
+                # Tentar encontrar qualquer coluna numérica
+                for col in df_projecao.columns:
+                    if col != coluna_data_proj:
+                        try:
+                            if pd.api.types.is_numeric_dtype(df_projecao[col]):
+                                coluna_valor_proj = col
+                                break
+                        except:
+                            pass
+            
+            # Verificar novamente
+            if not coluna_data_proj or not coluna_valor_proj:
+                st.warning(f"Formato de dados de projeção incompatível. Colunas disponíveis: {', '.join(df_projecao.columns)}")
+                return
         
         # Determinar colunas de valor no histórico
         coluna_valor_hist = obter_coluna_valor(df_historico)
@@ -440,31 +547,43 @@ def exibir_projecoes_robusta(id_indicador_prev, projecoes_indicadores, dados_fil
         
         # Adicionar dados históricos
         if not df_historico.empty and coluna_valor_hist and 'data' in df_historico.columns:
-            fig.add_trace(go.Scatter(
-                x=df_historico['data'],
-                y=df_historico[coluna_valor_hist],
-                name="Dados Históricos",
-                line=dict(color=config_ind['cor'])
-            ))
+            try:
+                fig.add_trace(go.Scatter(
+                    x=df_historico['data'],
+                    y=df_historico[coluna_valor_hist],
+                    name="Dados Históricos",
+                    line=dict(color=config_ind['cor'])
+                ))
+            except Exception as e:
+                logger.error(f"Erro ao adicionar dados históricos ao gráfico: {str(e)}")
+                st.warning("Não foi possível incluir dados históricos no gráfico.")
         
         # Adicionar projeção
-        fig.add_trace(go.Scatter(
-            x=df_projecao[coluna_data_proj],
-            y=df_projecao[coluna_valor_proj],
-            name="Projeção",
-            line=dict(color='rgba(0, 0, 255, 0.8)', dash='dash')
-        ))
+        try:
+            fig.add_trace(go.Scatter(
+                x=df_projecao[coluna_data_proj],
+                y=df_projecao[coluna_valor_proj],
+                name="Projeção",
+                line=dict(color='rgba(0, 0, 255, 0.8)', dash='dash')
+            ))
+        except Exception as e:
+            logger.error(f"Erro ao adicionar projeção ao gráfico: {str(e)}")
+            st.warning("Não foi possível incluir a linha de projeção no gráfico.")
+            return
         
         # Adicionar intervalo de confiança se disponível
         if coluna_limite_inf and coluna_limite_sup:
-            fig.add_trace(go.Scatter(
-                x=df_projecao[coluna_data_proj].tolist() + df_projecao[coluna_data_proj].tolist()[::-1],
-                y=df_projecao[coluna_limite_sup].tolist() + df_projecao[coluna_limite_inf].tolist()[::-1],
-                fill='toself',
-                fillcolor='rgba(0, 0, 255, 0.1)',
-                line=dict(color='rgba(255, 255, 255, 0)'),
-                name="Intervalo de Confiança (95%)"
-            ))
+            try:
+                fig.add_trace(go.Scatter(
+                    x=df_projecao[coluna_data_proj].tolist() + df_projecao[coluna_data_proj].tolist()[::-1],
+                    y=df_projecao[coluna_limite_sup].tolist() + df_projecao[coluna_limite_inf].tolist()[::-1],
+                    fill='toself',
+                    fillcolor='rgba(0, 0, 255, 0.1)',
+                    line=dict(color='rgba(255, 255, 255, 0)'),
+                    name="Intervalo de Confiança (95%)"
+                ))
+            except Exception as e:
+                logger.error(f"Erro ao adicionar intervalo de confiança ao gráfico: {str(e)}")
         
         # Configurar layout
         fig.update_layout(
@@ -494,38 +613,59 @@ def exibir_projecoes_robusta(id_indicador_prev, projecoes_indicadores, dados_fil
             if coluna_limite_sup:
                 colunas_tabela.append(coluna_limite_sup)
             
-            df_tabela = df_projecao[colunas_tabela].copy()
+            # Verificar se todas as colunas existem
+            colunas_existentes = [col for col in colunas_tabela if col in df_projecao.columns]
             
-            # Renomear colunas para exibição
-            mapeamento_colunas = {
-                coluna_data_proj: 'Data',
-                coluna_valor_proj: 'Projeção'
-            }
-            
-            if coluna_limite_inf:
-                mapeamento_colunas[coluna_limite_inf] = 'Limite Inferior'
-            
-            if coluna_limite_sup:
-                mapeamento_colunas[coluna_limite_sup] = 'Limite Superior'
-            
-            df_tabela = df_tabela.rename(columns=mapeamento_colunas)
-            
-            # Formatar valores
-            for col in ['Projeção', 'Limite Inferior', 'Limite Superior']:
-                if col in df_tabela.columns:
-                    df_tabela[col] = df_tabela[col].apply(
-                        lambda x: config_ind['formato'].format(x) if pd.notnull(x) else 'N/A'
-                    )
-            
-            # Formatar datas
-            if 'Data' in df_tabela.columns and pd.api.types.is_datetime64_any_dtype(df_tabela['Data']):
-                df_tabela['Data'] = df_tabela['Data'].dt.strftime('%d/%m/%Y')
-            
-            # Ordenar por data (mais próxima primeiro)
-            df_tabela = df_tabela.sort_values('Data')
-            
-            # Exibir tabela
-            st.dataframe(df_tabela, use_container_width=True)
+            if colunas_existentes:
+                df_tabela = df_projecao[colunas_existentes].copy()
+                
+                # Renomear colunas para exibição
+                mapeamento_colunas = {}
+                if coluna_data_proj in colunas_existentes:
+                    mapeamento_colunas[coluna_data_proj] = 'Data'
+                if coluna_valor_proj in colunas_existentes:
+                    mapeamento_colunas[coluna_valor_proj] = 'Projeção'
+                if coluna_limite_inf in colunas_existentes:
+                    mapeamento_colunas[coluna_limite_inf] = 'Limite Inferior'
+                if coluna_limite_sup in colunas_existentes:
+                    mapeamento_colunas[coluna_limite_sup] = 'Limite Superior'
+                
+                df_tabela = df_tabela.rename(columns=mapeamento_colunas)
+                
+                # Formatar valores
+                for col in ['Projeção', 'Limite Inferior', 'Limite Superior']:
+                    if col in df_tabela.columns:
+                        try:
+                            df_tabela[col] = df_tabela[col].apply(
+                                lambda x: config_ind['formato'].format(x) if pd.notnull(x) else 'N/A'
+                            )
+                        except Exception as e:
+                            logger.error(f"Erro ao formatar coluna {col}: {str(e)}")
+                            # Manter valores originais em caso de erro
+                
+                # Formatar datas
+                if 'Data' in df_tabela.columns:
+                    try:
+                        if pd.api.types.is_datetime64_any_dtype(df_tabela['Data']):
+                            df_tabela['Data'] = df_tabela['Data'].dt.strftime('%d/%m/%Y')
+                        elif isinstance(df_tabela['Data'].iloc[0], str):
+                            # Tentar converter para datetime e depois formatar
+                            df_tabela['Data'] = pd.to_datetime(df_tabela['Data'], errors='coerce').dt.strftime('%d/%m/%Y')
+                    except Exception as e:
+                        logger.error(f"Erro ao formatar datas: {str(e)}")
+                        # Manter valores originais em caso de erro
+                
+                # Ordenar por data (mais próxima primeiro)
+                try:
+                    if 'Data' in df_tabela.columns:
+                        df_tabela = df_tabela.sort_values('Data')
+                except Exception as e:
+                    logger.error(f"Erro ao ordenar tabela: {str(e)}")
+                
+                # Exibir tabela
+                st.dataframe(df_tabela, use_container_width=True)
+            else:
+                st.warning("Não foi possível criar tabela de projeções devido à falta de colunas necessárias.")
         except Exception as e:
             logger.error(f"Erro ao exibir tabela de projeções: {str(e)}")
             st.warning("Não foi possível exibir a tabela de projeções devido a um erro no formato dos dados.")
@@ -552,7 +692,7 @@ def exibir_projecoes_robusta(id_indicador_prev, projecoes_indicadores, dados_fil
             """)
     except Exception as e:
         logger.error(f"Erro ao exibir projeções: {str(e)}")
-        st.warning(f"Ocorreu um erro ao exibir as projeções: {str(e)}")
+        st.warning(f"Ocorreu um erro ao exibir as projeções. Por favor, tente novamente mais tarde.")
 
 # Função principal
 def main():
@@ -607,8 +747,11 @@ def main():
             if 'dados_indicadores' in st.session_state:
                 for df in st.session_state['dados_indicadores'].values():
                     if not df.empty and 'data' in df.columns:
-                        anos = df['data'].dt.year.unique().tolist()
-                        anos_disponiveis.extend(anos)
+                        try:
+                            anos = df['data'].dt.year.unique().tolist()
+                            anos_disponiveis.extend(anos)
+                        except Exception as e:
+                            logger.error(f"Erro ao extrair anos: {str(e)}")
             
             anos_disponiveis = sorted(list(set(anos_disponiveis)))
             
@@ -616,13 +759,19 @@ def main():
                 anos_disponiveis = list(range(2010, datetime.now().year + 1))
             
             # Slider para seleção de anos
-            ano_min, ano_max = st.select_slider(
-                "Selecione o intervalo de anos:",
-                options=anos_disponiveis,
-                value=(min(anos_disponiveis), max(anos_disponiveis))
-            )
-            
-            anos_selecionados = list(range(ano_min, ano_max + 1))
+            try:
+                ano_min, ano_max = st.select_slider(
+                    "Selecione o intervalo de anos:",
+                    options=anos_disponiveis,
+                    value=(min(anos_disponiveis), max(anos_disponiveis))
+                )
+                
+                anos_selecionados = list(range(ano_min, ano_max + 1))
+            except Exception as e:
+                logger.error(f"Erro ao criar slider de anos: {str(e)}")
+                # Fallback para anos padrão
+                anos_selecionados = list(range(2010, datetime.now().year + 1))
+                st.warning("Erro ao criar seletor de anos. Usando intervalo padrão.")
             
             # Filtro de indicadores
             st.subheader("Indicadores")
@@ -695,21 +844,35 @@ def main():
             }
             
             # Seleção de indicadores para visualização
-            indicadores_selecionados = st.multiselect(
-                "Selecione os indicadores para visualização:",
-                options=list(config_indicadores.keys()),
-                default=['pib', 'desemprego', 'ipca'],
-                format_func=lambda x: config_indicadores[x]['nome']
-            )
+            try:
+                indicadores_selecionados = st.multiselect(
+                    "Selecione os indicadores para visualização:",
+                    options=list(config_indicadores.keys()),
+                    default=['pib', 'desemprego', 'ipca'],
+                    format_func=lambda x: config_indicadores[x]['nome']
+                )
+            except Exception as e:
+                logger.error(f"Erro ao criar seletor de indicadores: {str(e)}")
+                # Fallback para indicadores padrão
+                indicadores_selecionados = ['pib', 'desemprego', 'ipca']
+                st.warning("Erro ao criar seletor de indicadores. Usando seleção padrão.")
             
             # Opções adicionais
             st.subheader("Opções")
             
             # Opção para mostrar eventos significativos
-            mostrar_eventos = st.checkbox("Mostrar eventos significativos", value=True)
+            try:
+                mostrar_eventos = st.checkbox("Mostrar eventos significativos", value=True)
+            except Exception as e:
+                logger.error(f"Erro ao criar checkbox de eventos: {str(e)}")
+                mostrar_eventos = True
             
             # Opção para mostrar projeções
-            mostrar_projecoes = st.checkbox("Mostrar projeções futuras", value=True)
+            try:
+                mostrar_projecoes = st.checkbox("Mostrar projeções futuras", value=True)
+            except Exception as e:
+                logger.error(f"Erro ao criar checkbox de projeções: {str(e)}")
+                mostrar_projecoes = True
         
         # Carregar dados se não estiverem na sessão
         if 'dados_indicadores' not in st.session_state:
@@ -738,16 +901,20 @@ def main():
         try:
             for id_indicador, df in dados_indicadores.items():
                 if not df.empty and 'data' in df.columns:
-                    # Adicionar coluna de ano
-                    df['ano'] = df['data'].dt.year
-                    
-                    # Filtrar por anos selecionados
-                    df_filtrado = df[df['ano'].isin(anos_selecionados)]
-                    
-                    # Remover coluna de ano (temporária)
-                    df_filtrado = df_filtrado.drop(columns=['ano'])
-                    
-                    dados_filtrados[id_indicador] = df_filtrado
+                    try:
+                        # Adicionar coluna de ano
+                        df['ano'] = df['data'].dt.year
+                        
+                        # Filtrar por anos selecionados
+                        df_filtrado = df[df['ano'].isin(anos_selecionados)]
+                        
+                        # Remover coluna de ano (temporária)
+                        df_filtrado = df_filtrado.drop(columns=['ano'])
+                        
+                        dados_filtrados[id_indicador] = df_filtrado
+                    except Exception as e:
+                        logger.error(f"Erro ao filtrar dados de {id_indicador}: {str(e)}")
+                        dados_filtrados[id_indicador] = df
                 else:
                     dados_filtrados[id_indicador] = df
         except Exception as e:
@@ -783,9 +950,14 @@ def main():
             return
         
         # Criar abas
-        tab_visao_geral, tab_detalhes, tab_comparativo, tab_previsoes, tab_exportar = st.tabs([
-            "Visão Geral", "Detalhes", "Comparativo", "Previsões", "Exportar Dados"
-        ])
+        try:
+            tab_visao_geral, tab_detalhes, tab_comparativo, tab_previsoes, tab_exportar = st.tabs([
+                "Visão Geral", "Detalhes", "Comparativo", "Previsões", "Exportar Dados"
+            ])
+        except Exception as e:
+            logger.error(f"Erro ao criar abas: {str(e)}")
+            st.error(f"Erro ao criar abas: {str(e)}")
+            return
         
         # Aba de Visão Geral
         with tab_visao_geral:
@@ -810,54 +982,94 @@ def main():
                 
                 if tem_dados:
                     # Criar colunas para métricas
-                    cols = st.columns(len(indicadores_selecionados) if indicadores_selecionados else 1)
+                    try:
+                        cols = st.columns(len(indicadores_selecionados) if indicadores_selecionados else 1)
+                    except Exception as e:
+                        logger.error(f"Erro ao criar colunas para métricas: {str(e)}")
+                        cols = [st.container()]
                     
                     # Exibir métricas para cada indicador selecionado
                     for i, id_indicador in enumerate(indicadores_selecionados):
-                        if id_indicador in dados_filtrados and not dados_filtrados[id_indicador].empty:
+                        try:
                             with cols[i % len(cols)]:
                                 try:
+                                    # Verificar se o indicador existe na configuração
+                                    if id_indicador not in config_indicadores:
+                                        st.warning(f"Configuração não encontrada para o indicador {id_indicador}")
+                                        continue
+                                    
                                     # Obter configuração do indicador
                                     config_ind = config_indicadores[id_indicador]
+                                    
+                                    # Verificar se há dados para o indicador
+                                    if id_indicador not in dados_filtrados or dados_filtrados[id_indicador].empty:
+                                        st.info(f"Sem dados para {config_ind['nome']}")
+                                        continue
                                     
                                     # Exibir ícone se disponível
                                     icone_path = os.path.join(DIRETORIO_ICONES, config_ind['icone'])
                                     if os.path.exists(icone_path):
                                         st.image(icone_path, width=50, use_container_width=False)
                                     
-                                    # Exibir métrica usando st.metric diretamente
-                                    # Obter o último valor
+                                    # Obter o DataFrame
                                     df = dados_filtrados[id_indicador]
-                                    if not df.empty and 'data' in df.columns:
+                                    
+                                    # Verificar se o DataFrame tem a coluna 'data'
+                                    if 'data' not in df.columns:
+                                        st.warning(f"Coluna 'data' não encontrada para {config_ind['nome']}")
+                                        continue
+                                    
+                                    # Determinar a coluna de valor
+                                    coluna_valor = obter_coluna_valor(df)
+                                    
+                                    # Verificar se encontrou uma coluna de valor
+                                    if coluna_valor is None:
+                                        st.warning(f"Não foi possível determinar a coluna de valor para {config_ind['nome']}")
+                                        continue
+                                    
+                                    # Verificar se há dados
+                                    if len(df) == 0:
+                                        st.info(f"Sem dados para {config_ind['nome']}")
+                                        continue
+                                    
+                                    # Obter a última linha
+                                    try:
                                         ultima_linha = df.iloc[-1]
                                         ultima_data = ultima_linha['data']
                                         
-                                        # Determinar a coluna de valor
-                                        coluna_valor = obter_coluna_valor(df)
+                                        # Obter e formatar o valor
+                                        valor = ultima_linha[coluna_valor]
                                         
-                                        # Verificar se encontrou uma coluna de valor
-                                        if coluna_valor is not None:
-                                            # Obter e formatar o valor
-                                            valor = ultima_linha[coluna_valor]
+                                        # Verificar se o valor é válido
+                                        if pd.isna(valor):
+                                            st.info(f"Valor não disponível para {config_ind['nome']}")
+                                            continue
+                                        
+                                        # Formatar o valor
+                                        try:
                                             valor_formatado = config_ind['formato'].format(valor)
-                                            
-                                            # Exibir a métrica
-                                            st.metric(
-                                                label=config_ind['nome'],
-                                                value=valor_formatado,
-                                                delta=None,
-                                                help=f"Última atualização: {ultima_data.strftime('%d/%m/%Y')}"
-                                            )
-                                            
-                                            # Exibir informação adicional
-                                            st.caption(f"Unidade: {config_ind['unidade']}")
-                                        else:
-                                            st.warning(f"Não foi possível determinar a coluna de valor para {config_ind['nome']}")
-                                    else:
-                                        st.warning(f"Dados insuficientes para {config_ind['nome']}")
+                                        except Exception as e:
+                                            logger.error(f"Erro ao formatar valor para {id_indicador}: {str(e)}")
+                                            valor_formatado = str(valor)
+                                        
+                                        # Exibir a métrica
+                                        st.metric(
+                                            label=config_ind['nome'],
+                                            value=valor_formatado,
+                                            delta=None,
+                                            help=f"Última atualização: {ultima_data.strftime('%d/%m/%Y')}"
+                                        )
+                                        
+                                        # Exibir informação adicional
+                                        st.caption(f"Unidade: {config_ind['unidade']}")
+                                    except Exception as e:
+                                        logger.error(f"Erro ao processar última linha para {id_indicador}: {str(e)}")
+                                        st.warning(f"Erro ao processar dados para {config_ind['nome']}")
                                 except Exception as e:
                                     logger.error(f"Erro ao exibir métrica para {id_indicador}: {str(e)}")
-                                    st.warning(f"Erro ao exibir métrica para {config_indicadores[id_indicador]['nome']}")
+                                    st.warning(f"Erro ao exibir métrica para {id_indicador}")
+                        except Exception as e:
+                            logger.error(f"Erro ao processar indicador {id_indicador}: {str(e)}")
                 else:
                     st.info("Nenhum dado disponível para exibição de métricas.")
                 
@@ -865,11 +1077,17 @@ def main():
                 st.header("Visualização Histórica de Indicadores Macroeconômicos")
                 
                 # Seleção do indicador principal
-                id_indicador_principal = st.selectbox(
-                    "Selecione o indicador principal:",
-                    options=indicadores_selecionados if indicadores_selecionados else list(config_indicadores.keys()),
-                    format_func=lambda x: config_indicadores[x]['nome']
-                )
+                try:
+                    id_indicador_principal = st.selectbox(
+                        "Selecione o indicador principal:",
+                        options=indicadores_selecionados if indicadores_selecionados else list(config_indicadores.keys()),
+                        format_func=lambda x: config_indicadores[x]['nome']
+                    )
+                except Exception as e:
+                    logger.error(f"Erro ao criar seletor de indicador principal: {str(e)}")
+                    # Fallback para primeiro indicador
+                    id_indicador_principal = indicadores_selecionados[0] if indicadores_selecionados else list(config_indicadores.keys())[0]
+                    st.warning("Erro ao criar seletor de indicador principal. Usando primeiro indicador.")
                 
                 # Verificar se há dados para o indicador selecionado
                 if id_indicador_principal in dados_filtrados and not dados_filtrados[id_indicador_principal].empty:
@@ -890,18 +1108,33 @@ def main():
                         # Implementação de fallback para exibir gráfico
                         try:
                             df = dados_filtrados[id_indicador_principal]
-                            coluna_valor = obter_coluna_valor(df)
                             
-                            if coluna_valor and 'data' in df.columns:
-                                fig = px.line(
-                                    df, 
-                                    x='data', 
-                                    y=coluna_valor,
-                                    title=f"Evolução de {config_ind['nome']} ({config_ind['unidade']})"
-                                )
-                                st.plotly_chart(fig, use_container_width=True)
+                            # Verificar se o DataFrame tem as colunas necessárias
+                            if 'data' not in df.columns:
+                                st.warning(f"Coluna 'data' não encontrada para {config_ind['nome']}")
                             else:
-                                st.warning(f"Não foi possível exibir o gráfico para {config_ind['nome']}")
+                                # Determinar a coluna de valor
+                                coluna_valor = obter_coluna_valor(df)
+                                
+                                if coluna_valor:
+                                    # Criar gráfico simples
+                                    fig = px.line(
+                                        df, 
+                                        x='data', 
+                                        y=coluna_valor,
+                                        title=f"Evolução de {config_ind['nome']} ({config_ind['unidade']})"
+                                    )
+                                    
+                                    # Configurar layout
+                                    fig.update_layout(
+                                        xaxis_title="Data",
+                                        yaxis_title=f"{config_ind['nome']} ({config_ind['unidade']})"
+                                    )
+                                    
+                                    # Exibir gráfico
+                                    st.plotly_chart(fig, use_container_width=True)
+                                else:
+                                    st.warning(f"Não foi possível determinar a coluna de valor para {config_ind['nome']}")
                         except Exception as e2:
                             logger.error(f"Erro no fallback para exibir série temporal: {str(e2)}")
                             st.warning(f"Não foi possível exibir o gráfico para {config_ind['nome']}")
@@ -917,100 +1150,169 @@ def main():
                 st.header("Análise Detalhada por Indicador")
                 
                 # Seleção do indicador para análise detalhada
-                id_indicador_detalhes = st.selectbox(
-                    "Selecione o indicador para análise detalhada:",
-                    options=indicadores_selecionados if indicadores_selecionados else list(config_indicadores.keys()),
-                    format_func=lambda x: config_indicadores[x]['nome'],
-                    key="detalhes_indicador"
-                )
+                try:
+                    id_indicador_detalhes = st.selectbox(
+                        "Selecione o indicador para análise detalhada:",
+                        options=indicadores_selecionados if indicadores_selecionados else list(config_indicadores.keys()),
+                        format_func=lambda x: config_indicadores[x]['nome'],
+                        key="detalhes_indicador"
+                    )
+                except Exception as e:
+                    logger.error(f"Erro ao criar seletor de indicador para detalhes: {str(e)}")
+                    # Fallback para primeiro indicador
+                    id_indicador_detalhes = indicadores_selecionados[0] if indicadores_selecionados else list(config_indicadores.keys())[0]
+                    st.warning("Erro ao criar seletor de indicador para detalhes. Usando primeiro indicador.")
                 
-                # Verificar se há dados para o indicador selecionado
-                if id_indicador_detalhes in dados_filtrados and not dados_filtrados[id_indicador_detalhes].empty:
+                # Verificar se o indicador existe na configuração
+                if id_indicador_detalhes not in config_indicadores:
+                    st.warning(f"Configuração não encontrada para o indicador {id_indicador_detalhes}")
+                else:
                     # Obter configuração do indicador
                     config_ind = config_indicadores[id_indicador_detalhes]
                     
-                    # Exibir estatísticas descritivas
-                    st.subheader(f"Estatísticas de {config_ind['nome']}")
-                    
-                    # Criar colunas para estatísticas e gráfico
-                    col1, col2 = st.columns([1, 2])
-                    
-                    with col1:
-                        try:
-                            # Exibir estatísticas
-                            exibidor_metricas.exibir_estatisticas_indicador(
-                                dados_filtrados[id_indicador_detalhes],
-                                config_ind['formato']
-                            )
-                        except Exception as e:
-                            logger.error(f"Erro ao exibir estatísticas: {str(e)}")
-                            st.warning("Não foi possível exibir estatísticas para este indicador.")
+                    # Verificar se há dados para o indicador selecionado
+                    if id_indicador_detalhes not in dados_filtrados or dados_filtrados[id_indicador_detalhes].empty:
+                        st.info(f"Não há dados disponíveis para {config_ind['nome']} no período selecionado.")
+                    else:
+                        # Exibir estatísticas descritivas
+                        st.subheader(f"Estatísticas de {config_ind['nome']}")
                         
-                        # Exibir informações adicionais
-                        st.info(f"""
-                        **Descrição:** {config_ind['descricao']}
+                        # Criar colunas para estatísticas e gráfico
+                        col1, col2 = st.columns([1, 2])
                         
-                        **Fonte:** {config_ind['fonte']}
-                        
-                        **Unidade:** {config_ind['unidade']}
-                        """)
-                    
-                    with col2:
-                        # Exibir gráfico de distribuição
-                        try:
-                            # Determinar a coluna de valor
-                            coluna_valor = obter_coluna_valor(dados_filtrados[id_indicador_detalhes])
-                            
-                            if coluna_valor:
-                                # Criar histograma
-                                fig = px.histogram(
-                                    dados_filtrados[id_indicador_detalhes], 
-                                    x=coluna_valor,
-                                    nbins=20,
-                                    title=f"Distribuição de {config_ind['nome']}",
-                                    labels={coluna_valor: config_ind['nome']}
+                        with col1:
+                            try:
+                                # Exibir estatísticas
+                                exibidor_metricas.exibir_estatisticas_indicador(
+                                    dados_filtrados[id_indicador_detalhes],
+                                    config_ind['formato']
                                 )
+                            except Exception as e:
+                                logger.error(f"Erro ao exibir estatísticas: {str(e)}")
                                 
-                                # Exibir gráfico
-                                st.plotly_chart(fig, use_container_width=True)
-                            else:
-                                st.warning("Não foi possível determinar a coluna de valor para o histograma")
-                        except Exception as e:
-                            logger.error(f"Erro ao exibir histograma: {str(e)}")
-                            st.warning("Erro ao exibir histograma")
-                    
-                    # Exibir tabela de dados
-                    st.subheader(f"Dados de {config_ind['nome']}")
-                    
-                    try:
-                        # Determinar a coluna de valor
-                        coluna_valor = obter_coluna_valor(dados_filtrados[id_indicador_detalhes])
+                                # Implementação de fallback para exibir estatísticas
+                                try:
+                                    df = dados_filtrados[id_indicador_detalhes]
+                                    
+                                    # Determinar a coluna de valor
+                                    coluna_valor = obter_coluna_valor(df)
+                                    
+                                    if coluna_valor:
+                                        # Calcular estatísticas básicas
+                                        try:
+                                            minimo = df[coluna_valor].min()
+                                            maximo = df[coluna_valor].max()
+                                            media = df[coluna_valor].mean()
+                                            mediana = df[coluna_valor].median()
+                                            
+                                            # Formatar valores
+                                            try:
+                                                minimo_fmt = config_ind['formato'].format(minimo)
+                                                maximo_fmt = config_ind['formato'].format(maximo)
+                                                media_fmt = config_ind['formato'].format(media)
+                                                mediana_fmt = config_ind['formato'].format(mediana)
+                                            except Exception as e:
+                                                logger.error(f"Erro ao formatar estatísticas: {str(e)}")
+                                                minimo_fmt = str(minimo)
+                                                maximo_fmt = str(maximo)
+                                                media_fmt = str(media)
+                                                mediana_fmt = str(mediana)
+                                            
+                                            # Exibir estatísticas
+                                            st.metric("Mínimo", minimo_fmt)
+                                            st.metric("Máximo", maximo_fmt)
+                                            st.metric("Média", media_fmt)
+                                            st.metric("Mediana", mediana_fmt)
+                                        except Exception as e:
+                                            logger.error(f"Erro ao calcular estatísticas: {str(e)}")
+                                            st.warning("Erro ao calcular estatísticas")
+                                    else:
+                                        st.warning(f"Não foi possível determinar a coluna de valor para {config_ind['nome']}")
+                                except Exception as e2:
+                                    logger.error(f"Erro no fallback para exibir estatísticas: {str(e2)}")
+                                    st.warning("Não foi possível exibir estatísticas para este indicador.")
+                            
+                            # Exibir informações adicionais
+                            st.info(f"""
+                            **Descrição:** {config_ind['descricao']}
+                            
+                            **Fonte:** {config_ind['fonte']}
+                            
+                            **Unidade:** {config_ind['unidade']}
+                            """)
                         
-                        if coluna_valor:
-                            # Criar tabela simplificada
-                            df_exibicao = dados_filtrados[id_indicador_detalhes][['data', coluna_valor]].copy()
-                            df_exibicao.columns = ['Data', config_ind['nome']]
+                        with col2:
+                            # Exibir gráfico de distribuição
+                            try:
+                                # Determinar a coluna de valor
+                                coluna_valor = obter_coluna_valor(dados_filtrados[id_indicador_detalhes])
+                                
+                                if coluna_valor:
+                                    # Criar histograma
+                                    fig = px.histogram(
+                                        dados_filtrados[id_indicador_detalhes], 
+                                        x=coluna_valor,
+                                        nbins=20,
+                                        title=f"Distribuição de {config_ind['nome']}",
+                                        labels={coluna_valor: config_ind['nome']}
+                                    )
+                                    
+                                    # Exibir gráfico
+                                    st.plotly_chart(fig, use_container_width=True)
+                                else:
+                                    st.warning("Não foi possível determinar a coluna de valor para o histograma")
+                            except Exception as e:
+                                logger.error(f"Erro ao exibir histograma: {str(e)}")
+                                st.warning("Erro ao exibir histograma")
+                        
+                        # Exibir tabela de dados
+                        st.subheader(f"Dados de {config_ind['nome']}")
+                        
+                        try:
+                            df = dados_filtrados[id_indicador_detalhes]
                             
-                            # Formatar valores
-                            df_exibicao[config_ind['nome']] = df_exibicao[config_ind['nome']].apply(
-                                lambda x: config_ind['formato'].format(x) if pd.notnull(x) else 'N/A'
-                            )
-                            
-                            # Formatar datas
-                            df_exibicao['Data'] = df_exibicao['Data'].dt.strftime('%d/%m/%Y')
-                            
-                            # Ordenar por data (mais recente primeiro)
-                            df_exibicao = df_exibicao.sort_values('Data', ascending=False)
-                            
-                            # Exibir tabela
-                            st.dataframe(df_exibicao, use_container_width=True)
-                        else:
-                            st.warning("Não foi possível determinar a coluna de valor para a tabela")
-                    except Exception as e:
-                        logger.error(f"Erro ao exibir tabela de dados: {str(e)}")
-                        st.warning("Não foi possível exibir a tabela de dados.")
-                else:
-                    st.info(f"Não há dados disponíveis para {config_indicadores[id_indicador_detalhes]['nome']} no período selecionado.")
+                            # Verificar se o DataFrame tem a coluna 'data'
+                            if 'data' not in df.columns:
+                                st.warning(f"Coluna 'data' não encontrada para {config_ind['nome']}")
+                            else:
+                                # Determinar a coluna de valor
+                                coluna_valor = obter_coluna_valor(df)
+                                
+                                if coluna_valor:
+                                    # Criar tabela simplificada
+                                    df_exibicao = df[['data', coluna_valor]].copy()
+                                    df_exibicao.columns = ['Data', config_ind['nome']]
+                                    
+                                    # Formatar valores
+                                    try:
+                                        df_exibicao[config_ind['nome']] = df_exibicao[config_ind['nome']].apply(
+                                            lambda x: config_ind['formato'].format(x) if pd.notnull(x) else 'N/A'
+                                        )
+                                    except Exception as e:
+                                        logger.error(f"Erro ao formatar valores para tabela: {str(e)}")
+                                        # Manter valores originais em caso de erro
+                                    
+                                    # Formatar datas
+                                    try:
+                                        df_exibicao['Data'] = df_exibicao['Data'].dt.strftime('%d/%m/%Y')
+                                    except Exception as e:
+                                        logger.error(f"Erro ao formatar datas para tabela: {str(e)}")
+                                        # Manter valores originais em caso de erro
+                                    
+                                    # Ordenar por data (mais recente primeiro)
+                                    try:
+                                        df_exibicao = df_exibicao.sort_values('Data', ascending=False)
+                                    except Exception as e:
+                                        logger.error(f"Erro ao ordenar tabela: {str(e)}")
+                                        # Manter ordem original em caso de erro
+                                    
+                                    # Exibir tabela
+                                    st.dataframe(df_exibicao, use_container_width=True)
+                                else:
+                                    st.warning("Não foi possível determinar a coluna de valor para a tabela")
+                        except Exception as e:
+                            logger.error(f"Erro ao exibir tabela de dados: {str(e)}")
+                            st.warning("Não foi possível exibir a tabela de dados.")
             except Exception as e:
                 logger.error(f"Erro na aba Detalhes: {str(e)}")
                 st.error(f"Ocorreu um erro na aba Detalhes: {str(e)}")
@@ -1028,148 +1330,192 @@ def main():
                     col1, col2 = st.columns(2)
                     
                     with col1:
-                        id_indicador_comp1 = st.selectbox(
-                            "Selecione o primeiro indicador:",
-                            options=indicadores_selecionados,
-                            format_func=lambda x: config_indicadores[x]['nome'],
-                            key="comp_ind1"
-                        )
+                        try:
+                            id_indicador_comp1 = st.selectbox(
+                                "Selecione o primeiro indicador:",
+                                options=indicadores_selecionados,
+                                format_func=lambda x: config_indicadores[x]['nome'],
+                                key="comp_ind1"
+                            )
+                        except Exception as e:
+                            logger.error(f"Erro ao criar seletor do primeiro indicador para comparação: {str(e)}")
+                            # Fallback para primeiro indicador
+                            id_indicador_comp1 = indicadores_selecionados[0]
+                            st.warning("Erro ao criar seletor do primeiro indicador. Usando primeiro indicador selecionado.")
                     
                     with col2:
-                        # Filtrar para não permitir selecionar o mesmo indicador duas vezes
-                        opcoes_restantes = [id for id in indicadores_selecionados if id != id_indicador_comp1]
-                        id_indicador_comp2 = st.selectbox(
-                            "Selecione o segundo indicador:",
-                            options=opcoes_restantes,
-                            format_func=lambda x: config_indicadores[x]['nome'],
-                            key="comp_ind2"
-                        )
-                    
-                    # Verificar se há dados para os indicadores selecionados
-                    if (id_indicador_comp1 in dados_filtrados and not dados_filtrados[id_indicador_comp1].empty and
-                        id_indicador_comp2 in dados_filtrados and not dados_filtrados[id_indicador_comp2].empty):
-                        
-                        # Obter configurações dos indicadores
-                        config_ind1 = config_indicadores[id_indicador_comp1]
-                        config_ind2 = config_indicadores[id_indicador_comp2]
-                        
-                        # Exibir gráfico de comparação
-                        st.subheader(f"Comparação: {config_ind1['nome']} vs {config_ind2['nome']}")
-                        
-                        # Criar gráfico de comparação
                         try:
-                            # Obter DataFrames
-                            df1 = dados_filtrados[id_indicador_comp1].copy()
-                            df2 = dados_filtrados[id_indicador_comp2].copy()
+                            # Filtrar para não permitir selecionar o mesmo indicador duas vezes
+                            opcoes_restantes = [id for id in indicadores_selecionados if id != id_indicador_comp1]
                             
-                            # Determinar colunas de valor
-                            coluna_valor1 = obter_coluna_valor(df1)
-                            coluna_valor2 = obter_coluna_valor(df2)
-                            
-                            if coluna_valor1 and coluna_valor2 and 'data' in df1.columns and 'data' in df2.columns:
-                                # Criar figura com dois eixos Y
-                                fig = go.Figure()
-                                
-                                # Adicionar primeira série
-                                fig.add_trace(go.Scatter(
-                                    x=df1['data'],
-                                    y=df1[coluna_valor1],
-                                    name=config_ind1['nome'],
-                                    line=dict(color=config_ind1['cor'])
-                                ))
-                                
-                                # Adicionar segunda série com eixo Y secundário
-                                fig.add_trace(go.Scatter(
-                                    x=df2['data'],
-                                    y=df2[coluna_valor2],
-                                    name=config_ind2['nome'],
-                                    line=dict(color=config_ind2['cor']),
-                                    yaxis="y2"
-                                ))
-                                
-                                # Configurar layout
-                                fig.update_layout(
-                                    title=f"Comparação: {config_ind1['nome']} vs {config_ind2['nome']}",
-                                    xaxis=dict(title="Data"),
-                                    yaxis=dict(
-                                        title=f"{config_ind1['nome']} ({config_ind1['unidade']})",
-                                        titlefont=dict(color=config_ind1['cor']),
-                                        tickfont=dict(color=config_ind1['cor'])
-                                    ),
-                                    yaxis2=dict(
-                                        title=f"{config_ind2['nome']} ({config_ind2['unidade']})",
-                                        titlefont=dict(color=config_ind2['cor']),
-                                        tickfont=dict(color=config_ind2['cor']),
-                                        anchor="x",
-                                        overlaying="y",
-                                        side="right"
-                                    ),
-                                    legend=dict(
-                                        orientation="h",
-                                        yanchor="bottom",
-                                        y=1.02,
-                                        xanchor="right",
-                                        x=1
-                                    )
+                            if opcoes_restantes:
+                                id_indicador_comp2 = st.selectbox(
+                                    "Selecione o segundo indicador:",
+                                    options=opcoes_restantes,
+                                    format_func=lambda x: config_indicadores[x]['nome'],
+                                    key="comp_ind2"
                                 )
-                                
-                                # Exibir gráfico
-                                st.plotly_chart(fig, use_container_width=True)
-                                
-                                # Exibir correlação
-                                st.subheader("Análise de Correlação")
-                                
-                                # Mesclar os DataFrames pela data
-                                df_mesclado = pd.merge(df1, df2, on='data', suffixes=('_1', '_2'))
-                                
-                                if not df_mesclado.empty:
-                                    # Calcular correlação
-                                    correlacao = df_mesclado[f"{coluna_valor1}_1"].corr(df_mesclado[f"{coluna_valor2}_2"])
-                                    
-                                    # Exibir resultado
-                                    st.metric(
-                                        "Coeficiente de Correlação de Pearson", 
-                                        f"{correlacao:.4f}",
-                                        help="Varia de -1 (correlação negativa perfeita) a 1 (correlação positiva perfeita). Valores próximos de 0 indicam pouca ou nenhuma correlação."
-                                    )
-                                    
-                                    # Interpretar o resultado
-                                    if abs(correlacao) < 0.3:
-                                        interpretacao = "Correlação fraca"
-                                        cor_interpretacao = "orange"
-                                    elif abs(correlacao) < 0.7:
-                                        interpretacao = "Correlação moderada"
-                                        cor_interpretacao = "blue"
-                                    else:
-                                        interpretacao = "Correlação forte"
-                                        cor_interpretacao = "green"
-                                    
-                                    st.markdown(f"<p style='color:{cor_interpretacao};font-weight:bold;'>{interpretacao}</p>", unsafe_allow_html=True)
-                                    
-                                    # Exibir gráfico de dispersão
-                                    fig_scatter = px.scatter(
-                                        df_mesclado, 
-                                        x=f"{coluna_valor1}_1", 
-                                        y=f"{coluna_valor2}_2",
-                                        trendline="ols",
-                                        labels={
-                                            f"{coluna_valor1}_1": f"{config_ind1['nome']} ({config_ind1['unidade']})",
-                                            f"{coluna_valor2}_2": f"{config_ind2['nome']} ({config_ind2['unidade']})"
-                                        },
-                                        title=f"Dispersão: {config_ind1['nome']} vs {config_ind2['nome']}"
-                                    )
-                                    
-                                    # Exibir gráfico
-                                    st.plotly_chart(fig_scatter, use_container_width=True)
-                                else:
-                                    st.warning("Não há dados com datas coincidentes para os indicadores selecionados.")
                             else:
-                                st.warning("Não foi possível determinar as colunas de valor para comparação")
+                                st.warning("Não há indicadores adicionais para comparação.")
+                                id_indicador_comp2 = None
                         except Exception as e:
-                            logger.error(f"Erro ao exibir comparação: {str(e)}")
-                            st.warning("Erro ao exibir comparação entre indicadores")
+                            logger.error(f"Erro ao criar seletor do segundo indicador para comparação: {str(e)}")
+                            # Fallback para segundo indicador
+                            opcoes_restantes = [id for id in indicadores_selecionados if id != id_indicador_comp1]
+                            id_indicador_comp2 = opcoes_restantes[0] if opcoes_restantes else None
+                            if id_indicador_comp2:
+                                st.warning("Erro ao criar seletor do segundo indicador. Usando segundo indicador disponível.")
+                    
+                    # Verificar se ambos os indicadores foram selecionados
+                    if id_indicador_comp1 is None or id_indicador_comp2 is None:
+                        st.warning("Não foi possível selecionar dois indicadores diferentes para comparação.")
                     else:
-                        st.info("Não há dados disponíveis para os indicadores selecionados no período selecionado.")
+                        # Verificar se os indicadores existem na configuração
+                        if id_indicador_comp1 not in config_indicadores or id_indicador_comp2 not in config_indicadores:
+                            st.warning("Configuração não encontrada para um ou ambos os indicadores selecionados.")
+                        else:
+                            # Obter configurações dos indicadores
+                            config_ind1 = config_indicadores[id_indicador_comp1]
+                            config_ind2 = config_indicadores[id_indicador_comp2]
+                            
+                            # Verificar se há dados para os indicadores selecionados
+                            if (id_indicador_comp1 not in dados_filtrados or dados_filtrados[id_indicador_comp1].empty or
+                                id_indicador_comp2 not in dados_filtrados or dados_filtrados[id_indicador_comp2].empty):
+                                st.info("Não há dados disponíveis para um ou ambos os indicadores selecionados no período selecionado.")
+                            else:
+                                # Verificar se os DataFrames têm a coluna 'data'
+                                df1 = dados_filtrados[id_indicador_comp1]
+                                df2 = dados_filtrados[id_indicador_comp2]
+                                
+                                if 'data' not in df1.columns or 'data' not in df2.columns:
+                                    st.warning("Coluna 'data' não encontrada para um ou ambos os indicadores.")
+                                else:
+                                    # Determinar colunas de valor
+                                    coluna_valor1 = obter_coluna_valor(df1)
+                                    coluna_valor2 = obter_coluna_valor(df2)
+                                    
+                                    if not coluna_valor1 or not coluna_valor2:
+                                        st.warning("Não foi possível determinar as colunas de valor para um ou ambos os indicadores.")
+                                    else:
+                                        # Exibir gráfico de comparação
+                                        st.subheader(f"Comparação: {config_ind1['nome']} vs {config_ind2['nome']}")
+                                        
+                                        # Criar gráfico de comparação
+                                        try:
+                                            # Criar figura com dois eixos Y
+                                            fig = go.Figure()
+                                            
+                                            # Adicionar primeira série
+                                            fig.add_trace(go.Scatter(
+                                                x=df1['data'],
+                                                y=df1[coluna_valor1],
+                                                name=config_ind1['nome'],
+                                                line=dict(color=config_ind1['cor'])
+                                            ))
+                                            
+                                            # Adicionar segunda série com eixo Y secundário
+                                            fig.add_trace(go.Scatter(
+                                                x=df2['data'],
+                                                y=df2[coluna_valor2],
+                                                name=config_ind2['nome'],
+                                                line=dict(color=config_ind2['cor']),
+                                                yaxis="y2"
+                                            ))
+                                            
+                                            # Configurar layout
+                                            fig.update_layout(
+                                                title=f"Comparação: {config_ind1['nome']} vs {config_ind2['nome']}",
+                                                xaxis=dict(title="Data"),
+                                                yaxis=dict(
+                                                    title=f"{config_ind1['nome']} ({config_ind1['unidade']})",
+                                                    titlefont=dict(color=config_ind1['cor']),
+                                                    tickfont=dict(color=config_ind1['cor'])
+                                                ),
+                                                yaxis2=dict(
+                                                    title=f"{config_ind2['nome']} ({config_ind2['unidade']})",
+                                                    titlefont=dict(color=config_ind2['cor']),
+                                                    tickfont=dict(color=config_ind2['cor']),
+                                                    anchor="x",
+                                                    overlaying="y",
+                                                    side="right"
+                                                ),
+                                                legend=dict(
+                                                    orientation="h",
+                                                    yanchor="bottom",
+                                                    y=1.02,
+                                                    xanchor="right",
+                                                    x=1
+                                                )
+                                            )
+                                            
+                                            # Exibir gráfico
+                                            st.plotly_chart(fig, use_container_width=True)
+                                            
+                                            # Exibir correlação
+                                            st.subheader("Análise de Correlação")
+                                            
+                                            # Mesclar os DataFrames pela data
+                                            try:
+                                                df_mesclado = pd.merge(df1, df2, on='data', suffixes=('_1', '_2'))
+                                                
+                                                if not df_mesclado.empty:
+                                                    # Verificar se as colunas existem no DataFrame mesclado
+                                                    coluna_valor1_mesclado = f"{coluna_valor1}_1"
+                                                    coluna_valor2_mesclado = f"{coluna_valor2}_2"
+                                                    
+                                                    if coluna_valor1_mesclado in df_mesclado.columns and coluna_valor2_mesclado in df_mesclado.columns:
+                                                        # Calcular correlação
+                                                        correlacao = df_mesclado[coluna_valor1_mesclado].corr(df_mesclado[coluna_valor2_mesclado])
+                                                        
+                                                        # Exibir resultado
+                                                        st.metric(
+                                                            "Coeficiente de Correlação de Pearson", 
+                                                            f"{correlacao:.4f}",
+                                                            help="Varia de -1 (correlação negativa perfeita) a 1 (correlação positiva perfeita). Valores próximos de 0 indicam pouca ou nenhuma correlação."
+                                                        )
+                                                        
+                                                        # Interpretar o resultado
+                                                        if abs(correlacao) < 0.3:
+                                                            interpretacao = "Correlação fraca"
+                                                            cor_interpretacao = "orange"
+                                                        elif abs(correlacao) < 0.7:
+                                                            interpretacao = "Correlação moderada"
+                                                            cor_interpretacao = "blue"
+                                                        else:
+                                                            interpretacao = "Correlação forte"
+                                                            cor_interpretacao = "green"
+                                                        
+                                                        st.markdown(f"<p style='color:{cor_interpretacao};font-weight:bold;'>{interpretacao}</p>", unsafe_allow_html=True)
+                                                        
+                                                        # Exibir gráfico de dispersão
+                                                        try:
+                                                            fig_scatter = px.scatter(
+                                                                df_mesclado, 
+                                                                x=coluna_valor1_mesclado, 
+                                                                y=coluna_valor2_mesclado,
+                                                                trendline="ols",
+                                                                labels={
+                                                                    coluna_valor1_mesclado: f"{config_ind1['nome']} ({config_ind1['unidade']})",
+                                                                    coluna_valor2_mesclado: f"{config_ind2['nome']} ({config_ind2['unidade']})"
+                                                                },
+                                                                title=f"Dispersão: {config_ind1['nome']} vs {config_ind2['nome']}"
+                                                            )
+                                                            
+                                                            # Exibir gráfico
+                                                            st.plotly_chart(fig_scatter, use_container_width=True)
+                                                        except Exception as e:
+                                                            logger.error(f"Erro ao criar gráfico de dispersão: {str(e)}")
+                                                            st.warning("Não foi possível criar o gráfico de dispersão.")
+                                                    else:
+                                                        st.warning("Colunas de valor não encontradas após mesclar os dados.")
+                                                else:
+                                                    st.warning("Não há dados com datas coincidentes para os indicadores selecionados.")
+                                            except Exception as e:
+                                                logger.error(f"Erro ao mesclar DataFrames: {str(e)}")
+                                                st.warning("Erro ao analisar correlação entre os indicadores.")
+                                        except Exception as e:
+                                            logger.error(f"Erro ao exibir comparação: {str(e)}")
+                                            st.warning("Erro ao exibir comparação entre indicadores")
             except Exception as e:
                 logger.error(f"Erro na aba Comparativo: {str(e)}")
                 st.error(f"Ocorreu um erro na aba Comparativo: {str(e)}")
@@ -1183,12 +1529,18 @@ def main():
                     st.info("Ative a opção 'Mostrar projeções futuras' no painel lateral para visualizar as projeções.")
                 else:
                     # Seleção do indicador para projeção
-                    id_indicador_prev = st.selectbox(
-                        "Selecione o indicador para projeção:",
-                        options=indicadores_selecionados if indicadores_selecionados else list(config_indicadores.keys()),
-                        format_func=lambda x: config_indicadores[x]['nome'],
-                        key="prev_ind"
-                    )
+                    try:
+                        id_indicador_prev = st.selectbox(
+                            "Selecione o indicador para projeção:",
+                            options=indicadores_selecionados if indicadores_selecionados else list(config_indicadores.keys()),
+                            format_func=lambda x: config_indicadores[x]['nome'],
+                            key="prev_ind"
+                        )
+                    except Exception as e:
+                        logger.error(f"Erro ao criar seletor de indicador para projeção: {str(e)}")
+                        # Fallback para primeiro indicador
+                        id_indicador_prev = indicadores_selecionados[0] if indicadores_selecionados else list(config_indicadores.keys())[0]
+                        st.warning("Erro ao criar seletor de indicador para projeção. Usando primeiro indicador.")
                     
                     # Usar a função robusta para exibir projeções
                     exibir_projecoes_robusta(id_indicador_prev, projecoes_indicadores, dados_filtrados, config_indicadores)
@@ -1202,153 +1554,185 @@ def main():
                 st.header("Exportar Dados")
                 
                 # Seleção do indicador para exportação
-                id_indicador_exp = st.selectbox(
-                    "Selecione o indicador para exportação:",
-                    options=indicadores_selecionados if indicadores_selecionados else list(config_indicadores.keys()),
-                    format_func=lambda x: config_indicadores[x]['nome'],
-                    key="exp_ind"
-                )
+                try:
+                    id_indicador_exp = st.selectbox(
+                        "Selecione o indicador para exportação:",
+                        options=indicadores_selecionados if indicadores_selecionados else list(config_indicadores.keys()),
+                        format_func=lambda x: config_indicadores[x]['nome'],
+                        key="exp_ind"
+                    )
+                except Exception as e:
+                    logger.error(f"Erro ao criar seletor de indicador para exportação: {str(e)}")
+                    # Fallback para primeiro indicador
+                    id_indicador_exp = indicadores_selecionados[0] if indicadores_selecionados else list(config_indicadores.keys())[0]
+                    st.warning("Erro ao criar seletor de indicador para exportação. Usando primeiro indicador.")
                 
-                # Verificar se há dados para o indicador selecionado
-                if id_indicador_exp in dados_filtrados and not dados_filtrados[id_indicador_exp].empty:
+                # Verificar se o indicador existe na configuração
+                if id_indicador_exp not in config_indicadores:
+                    st.warning(f"Configuração não encontrada para o indicador {id_indicador_exp}")
+                else:
                     # Obter configuração do indicador
                     config_ind = config_indicadores[id_indicador_exp]
                     
-                    # Exibir opções de exportação
-                    st.subheader("Opções de Exportação")
-                    
-                    # Seleção do formato
-                    formato_exp = st.radio(
-                        "Selecione o formato de exportação:",
-                        options=["CSV", "Excel", "JSON"],
-                        horizontal=True
-                    )
-                    
-                    # Opção para incluir projeções
-                    incluir_projecoes = st.checkbox(
-                        "Incluir projeções",
-                        value=True if mostrar_projecoes and id_indicador_exp in projecoes_indicadores and not projecoes_indicadores[id_indicador_exp].empty else False,
-                        disabled=not (mostrar_projecoes and id_indicador_exp in projecoes_indicadores and not projecoes_indicadores[id_indicador_exp].empty)
-                    )
-                    
-                    # Botão de exportação
-                    if st.button("Exportar Dados"):
-                        try:
-                            # Obter DataFrame
-                            df_exp = dados_filtrados[id_indicador_exp].copy()
-                            
-                            # Incluir projeções se solicitado
-                            if incluir_projecoes and id_indicador_exp in projecoes_indicadores and not projecoes_indicadores[id_indicador_exp].empty:
-                                try:
-                                    df_proj = projecoes_indicadores[id_indicador_exp].copy()
-                                    
-                                    # Verificar e mapear colunas do DataFrame de projeção
-                                    colunas_data = ['ds', 'data']  # Possíveis nomes para coluna de data
-                                    colunas_valor = ['yhat', 'valor', 'projecao']  # Possíveis nomes para coluna de valor
-                                    colunas_limite_inf = ['yhat_lower', 'limite_inferior']  # Possíveis nomes para limite inferior
-                                    colunas_limite_sup = ['yhat_upper', 'limite_superior']  # Possíveis nomes para limite superior
-                                    
-                                    # Encontrar coluna de data
-                                    coluna_data_proj = None
-                                    for col in colunas_data:
-                                        if col in df_proj.columns:
-                                            coluna_data_proj = col
-                                            break
-                                    
-                                    # Encontrar coluna de valor
-                                    coluna_valor_proj = None
-                                    for col in colunas_valor:
-                                        if col in df_proj.columns:
-                                            coluna_valor_proj = col
-                                            break
-                                    
-                                    if coluna_data_proj and coluna_valor_proj:
-                                        # Renomear colunas para padronização
-                                        mapeamento_colunas = {coluna_data_proj: 'data', coluna_valor_proj: 'projecao'}
-                                        
-                                        # Adicionar mapeamento para limites se existirem
-                                        for col in colunas_limite_inf:
-                                            if col in df_proj.columns:
-                                                mapeamento_colunas[col] = 'limite_inferior'
-                                                break
-                                        
-                                        for col in colunas_limite_sup:
-                                            if col in df_proj.columns:
-                                                mapeamento_colunas[col] = 'limite_superior'
-                                                break
-                                        
-                                        # Renomear colunas
-                                        df_proj = df_proj.rename(columns=mapeamento_colunas)
-                                        
-                                        # Adicionar coluna de tipo
-                                        df_exp['tipo'] = 'historico'
-                                        df_proj['tipo'] = 'projecao'
-                                        
-                                        # Selecionar colunas relevantes
-                                        coluna_valor = obter_coluna_valor(df_exp)
-                                        if coluna_valor:
-                                            # Adicionar colunas de valor às projeções
-                                            if coluna_valor not in df_proj.columns:
-                                                df_proj[coluna_valor] = None
-                                            
-                                            # Concatenar DataFrames
-                                            df_exp = pd.concat([df_exp, df_proj], ignore_index=True)
-                                    else:
-                                        st.warning("Não foi possível incluir projeções devido a incompatibilidade de formato")
-                                except Exception as e:
-                                    logger.error(f"Erro ao incluir projeções na exportação: {str(e)}")
-                                    st.warning(f"Não foi possível incluir projeções: {str(e)}")
-                            
-                            # Exportar conforme formato selecionado
-                            nome_arquivo = f"{id_indicador_exp}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-                            
-                            if formato_exp == "CSV":
-                                # Exportar para CSV
-                                caminho_arquivo = exportador.exportar_csv(df_exp, nome_arquivo)
-                                st.success(f"Dados exportados com sucesso para {caminho_arquivo}")
-                                
-                                # Oferecer download
-                                with open(caminho_arquivo, 'r') as f:
-                                    st.download_button(
-                                        label="Baixar arquivo CSV",
-                                        data=f,
-                                        file_name=f"{nome_arquivo}.csv",
-                                        mime="text/csv"
-                                    )
-                            
-                            elif formato_exp == "Excel":
-                                # Exportar para Excel
-                                caminho_arquivo = exportador.exportar_excel(df_exp, nome_arquivo)
-                                st.success(f"Dados exportados com sucesso para {caminho_arquivo}")
-                                
-                                # Oferecer download
-                                with open(caminho_arquivo, 'rb') as f:
-                                    st.download_button(
-                                        label="Baixar arquivo Excel",
-                                        data=f,
-                                        file_name=f"{nome_arquivo}.xlsx",
-                                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                                    )
-                            
-                            elif formato_exp == "JSON":
-                                # Exportar para JSON
-                                caminho_arquivo = exportador.exportar_json(df_exp, nome_arquivo)
-                                st.success(f"Dados exportados com sucesso para {caminho_arquivo}")
-                                
-                                # Oferecer download
-                                with open(caminho_arquivo, 'r') as f:
-                                    st.download_button(
-                                        label="Baixar arquivo JSON",
-                                        data=f,
-                                        file_name=f"{nome_arquivo}.json",
-                                        mime="application/json"
-                                    )
+                    # Verificar se há dados para o indicador selecionado
+                    if id_indicador_exp not in dados_filtrados or dados_filtrados[id_indicador_exp].empty:
+                        st.info(f"Não há dados disponíveis para {config_ind['nome']} no período selecionado.")
+                    else:
+                        # Exibir opções de exportação
+                        st.subheader("Opções de Exportação")
                         
+                        # Seleção do formato
+                        try:
+                            formato_exp = st.radio(
+                                "Selecione o formato de exportação:",
+                                options=["CSV", "Excel", "JSON"],
+                                horizontal=True
+                            )
                         except Exception as e:
-                            logger.error(f"Erro ao exportar dados: {str(e)}")
-                            st.error(f"Erro ao exportar dados: {str(e)}")
-                else:
-                    st.info(f"Não há dados disponíveis para {config_indicadores[id_indicador_exp]['nome']} no período selecionado.")
+                            logger.error(f"Erro ao criar seletor de formato de exportação: {str(e)}")
+                            formato_exp = "CSV"
+                            st.warning("Erro ao criar seletor de formato. Usando CSV como padrão.")
+                        
+                        # Opção para incluir projeções
+                        try:
+                            incluir_projecoes = st.checkbox(
+                                "Incluir projeções",
+                                value=True if mostrar_projecoes and id_indicador_exp in projecoes_indicadores and not projecoes_indicadores[id_indicador_exp].empty else False,
+                                disabled=not (mostrar_projecoes and id_indicador_exp in projecoes_indicadores and not projecoes_indicadores[id_indicador_exp].empty)
+                            )
+                        except Exception as e:
+                            logger.error(f"Erro ao criar checkbox de inclusão de projeções: {str(e)}")
+                            incluir_projecoes = False
+                            st.warning("Erro ao criar opção de inclusão de projeções. Projeções não serão incluídas.")
+                        
+                        # Botão de exportação
+                        if st.button("Exportar Dados"):
+                            try:
+                                # Obter DataFrame
+                                df_exp = dados_filtrados[id_indicador_exp].copy()
+                                
+                                # Incluir projeções se solicitado
+                                if incluir_projecoes and id_indicador_exp in projecoes_indicadores and not projecoes_indicadores[id_indicador_exp].empty:
+                                    try:
+                                        df_proj = projecoes_indicadores[id_indicador_exp].copy()
+                                        
+                                        # Verificar e mapear colunas do DataFrame de projeção
+                                        colunas_data = ['ds', 'data']  # Possíveis nomes para coluna de data
+                                        colunas_valor = ['yhat', 'valor', 'projecao']  # Possíveis nomes para coluna de valor
+                                        colunas_limite_inf = ['yhat_lower', 'limite_inferior']  # Possíveis nomes para limite inferior
+                                        colunas_limite_sup = ['yhat_upper', 'limite_superior']  # Possíveis nomes para limite superior
+                                        
+                                        # Encontrar coluna de data
+                                        coluna_data_proj = None
+                                        for col in colunas_data:
+                                            if col in df_proj.columns:
+                                                coluna_data_proj = col
+                                                break
+                                        
+                                        # Encontrar coluna de valor
+                                        coluna_valor_proj = None
+                                        for col in colunas_valor:
+                                            if col in df_proj.columns:
+                                                coluna_valor_proj = col
+                                                break
+                                        
+                                        if coluna_data_proj and coluna_valor_proj:
+                                            # Renomear colunas para padronização
+                                            mapeamento_colunas = {coluna_data_proj: 'data', coluna_valor_proj: 'projecao'}
+                                            
+                                            # Adicionar mapeamento para limites se existirem
+                                            for col in colunas_limite_inf:
+                                                if col in df_proj.columns:
+                                                    mapeamento_colunas[col] = 'limite_inferior'
+                                                    break
+                                            
+                                            for col in colunas_limite_sup:
+                                                if col in df_proj.columns:
+                                                    mapeamento_colunas[col] = 'limite_superior'
+                                                    break
+                                            
+                                            # Renomear colunas
+                                            df_proj = df_proj.rename(columns=mapeamento_colunas)
+                                            
+                                            # Adicionar coluna de tipo
+                                            df_exp['tipo'] = 'historico'
+                                            df_proj['tipo'] = 'projecao'
+                                            
+                                            # Selecionar colunas relevantes
+                                            coluna_valor = obter_coluna_valor(df_exp)
+                                            if coluna_valor:
+                                                # Adicionar colunas de valor às projeções
+                                                if coluna_valor not in df_proj.columns:
+                                                    df_proj[coluna_valor] = None
+                                                
+                                                # Concatenar DataFrames
+                                                df_exp = pd.concat([df_exp, df_proj], ignore_index=True)
+                                        else:
+                                            st.warning("Não foi possível incluir projeções devido a incompatibilidade de formato")
+                                    except Exception as e:
+                                        logger.error(f"Erro ao incluir projeções na exportação: {str(e)}")
+                                        st.warning(f"Não foi possível incluir projeções: {str(e)}")
+                                
+                                # Exportar conforme formato selecionado
+                                nome_arquivo = f"{id_indicador_exp}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+                                
+                                if formato_exp == "CSV":
+                                    # Exportar para CSV
+                                    try:
+                                        caminho_arquivo = exportador.exportar_csv(df_exp, nome_arquivo)
+                                        st.success(f"Dados exportados com sucesso para {caminho_arquivo}")
+                                        
+                                        # Oferecer download
+                                        with open(caminho_arquivo, 'r') as f:
+                                            st.download_button(
+                                                label="Baixar arquivo CSV",
+                                                data=f,
+                                                file_name=f"{nome_arquivo}.csv",
+                                                mime="text/csv"
+                                            )
+                                    except Exception as e:
+                                        logger.error(f"Erro ao exportar para CSV: {str(e)}")
+                                        st.error(f"Erro ao exportar para CSV: {str(e)}")
+                                
+                                elif formato_exp == "Excel":
+                                    # Exportar para Excel
+                                    try:
+                                        caminho_arquivo = exportador.exportar_excel(df_exp, nome_arquivo)
+                                        st.success(f"Dados exportados com sucesso para {caminho_arquivo}")
+                                        
+                                        # Oferecer download
+                                        with open(caminho_arquivo, 'rb') as f:
+                                            st.download_button(
+                                                label="Baixar arquivo Excel",
+                                                data=f,
+                                                file_name=f"{nome_arquivo}.xlsx",
+                                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                                            )
+                                    except Exception as e:
+                                        logger.error(f"Erro ao exportar para Excel: {str(e)}")
+                                        st.error(f"Erro ao exportar para Excel: {str(e)}")
+                                
+                                elif formato_exp == "JSON":
+                                    # Exportar para JSON
+                                    try:
+                                        caminho_arquivo = exportador.exportar_json(df_exp, nome_arquivo)
+                                        st.success(f"Dados exportados com sucesso para {caminho_arquivo}")
+                                        
+                                        # Oferecer download
+                                        with open(caminho_arquivo, 'r') as f:
+                                            st.download_button(
+                                                label="Baixar arquivo JSON",
+                                                data=f,
+                                                file_name=f"{nome_arquivo}.json",
+                                                mime="application/json"
+                                            )
+                                    except Exception as e:
+                                        logger.error(f"Erro ao exportar para JSON: {str(e)}")
+                                        st.error(f"Erro ao exportar para JSON: {str(e)}")
+                            
+                            except Exception as e:
+                                logger.error(f"Erro ao exportar dados: {str(e)}")
+                                st.error(f"Erro ao exportar dados: {str(e)}")
             except Exception as e:
                 logger.error(f"Erro na aba Exportar: {str(e)}")
                 st.error(f"Ocorreu um erro na aba Exportar: {str(e)}")
