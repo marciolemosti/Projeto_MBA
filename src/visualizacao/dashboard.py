@@ -1740,6 +1740,8 @@ def main():
         logger.error(f"Erro geral no dashboard: {str(e)}")
         st.error(f"Ocorreu um erro no dashboard: {str(e)}")
 
+    st.mardown("---")
+    st.caption("Desenvolvido por Márcio Lemos")
 # Executar o dashboard
 if __name__ == "__main__":
     main()
