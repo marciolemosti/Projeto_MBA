@@ -73,8 +73,8 @@ termometro-economia/
 
 1. Clone o repositório:
    ```bash
-   git clone https://github.com/seu-usuario/termometro-economia.git
-   cd termometro-economia
+   git clone https://github.com/marciolemosti/Projeto_MBA.git
+   cd Projeto_MBA
    ```
 
 2. Crie e ative um ambiente virtual:
@@ -132,7 +132,8 @@ Para adicionar um novo indicador:
 2. Adicione o código e nome da série em `src/utils/configuracao.py` na seção `CONFIGURACAO_EXTRACAO`
 3. Configure a visualização do indicador na seção `CONFIGURACAO_VISUALIZACAO`
 
-### TCC MBA em Gestão Analítica com BI e Big Data
+### TCC MBA em Gestão Analítica com BI e Big Data - UNIFOR
+Desenvolvido por Márcio Lemos
 
 Universidade de Fortaleza - UNIFOR
 
