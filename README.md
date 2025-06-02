@@ -2,8 +2,6 @@
 
 Dashboard interativo com indicadores econômicos chave do Brasil, incluindo previsões de déficit primário e arrecadação de IOF.
 
-![Banner do Projeto](assets/banner2.png)
-
 ## Sobre o Projeto
 
 O Termômetro da Economia Brasileira é um dashboard interativo que apresenta indicadores econômicos chave do Brasil, com foco especial em déficit primário e arrecadação de IOF. O sistema extrai dados automaticamente do Banco Central do Brasil (BCB) e do Instituto Brasileiro de Geografia e Estatística (IBGE), processa séries temporais e gera previsões utilizando modelos estatísticos avançados.
