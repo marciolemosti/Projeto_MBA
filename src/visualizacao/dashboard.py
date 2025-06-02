@@ -1740,8 +1740,23 @@ def main():
         logger.error(f"Erro geral no dashboard: {str(e)}")
         st.error(f"Ocorreu um erro no dashboard: {str(e)}")
 
-    st.mardown("---")
-    st.caption("Desenvolvido por Márcio Lemos")
+    st.mardown("<div style='text-align: right;'>Desenvolvido por Márcio Lemos®</div>", unsafe_allow_html=True")
+    st.caption("Desenvolvido por Márcio Lemos®")
+
+    st.markdown("""
+<style>
+.footer {
+    position: fixed;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    text-align: center;
+    padding: 10px;
+}
+</style>
+<div class="footer">Desenvolvido por Márcio Lemos®</div>
+""", unsafe_allow_html=True)
+
 # Executar o dashboard
 if __name__ == "__main__":
     main()
