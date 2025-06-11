@@ -11,9 +11,16 @@ import json
 import logging
 import pandas as pd
 import numpy as np
-from prophet import Prophet
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Union, Any, Tuple
+
+# Importação opcional do Prophet
+try:
+    from prophet import Prophet
+    PROPHET_AVAILABLE = True
+except ImportError:
+    PROPHET_AVAILABLE = False
+    Prophet = None
 
 # Configuração de logging
 logger = logging.getLogger(__name__)

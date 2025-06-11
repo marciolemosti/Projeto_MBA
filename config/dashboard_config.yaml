@@ -1,0 +1,61 @@
+# Configuração do Dashboard Econômico - Versão Simplificada
+
+dashboard:
+  titulo: "Termômetro da Economia Brasileira"
+  subtitulo: "Dashboard Interativo de Indicadores Econômicos"
+  desenvolvedor: "Márcio Lemos"
+  versao: "2.0"
+
+cache:
+  ttl_padrao: 3600    # 1 hora
+  ttl_dados: 1800     # 30 minutos
+  ttl_previsoes: 7200 # 2 horas
+
+indicadores:
+  ipca:
+    nome: "IPCA"
+    unidade: "%"
+    cor: "#FF6B6B"
+    descricao: "Índice de Preços ao Consumidor Amplo"
+  
+  selic:
+    nome: "Taxa Selic"
+    unidade: "% a.a."
+    cor: "#4ECDC4"
+    descricao: "Taxa básica de juros da economia"
+  
+  cambio:
+    nome: "Câmbio USD/BRL"
+    unidade: "R$"
+    cor: "#45B7D1"
+    descricao: "Taxa de câmbio Dólar/Real"
+  
+  deficit_primario:
+    nome: "Déficit Primário"
+    unidade: "R$ bi"
+    cor: "#96CEB4"
+    descricao: "Resultado primário do governo"
+  
+  iof:
+    nome: "Arrecadação IOF"
+    unidade: "R$ mi"
+    cor: "#FFEAA7"
+    descricao: "Imposto sobre Operações Financeiras"
+  
+  pib:
+    nome: "PIB (Amostra)"
+    unidade: "%"
+    cor: "#DDA0DD"
+    descricao: "Produto Interno Bruto - variação trimestral"
+  
+  desemprego:
+    nome: "Taxa de Desemprego (Amostra)"
+    unidade: "%"
+    cor: "#F8B500"
+    descricao: "Taxa de desocupação"
+
+interface:
+  layout: "wide"
+  sidebar_inicial: "expanded"
+  tema: "light"
+

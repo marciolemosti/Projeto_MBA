@@ -1,139 +1,117 @@
-# Termômetro da Economia Brasileira
-
-Dashboard interativo com indicadores econômicos chave do Brasil, incluindo previsões de déficit primário e arrecadação de IOF.
+# Termômetro da Economia Brasileira - Versão Lite
 
 ## Sobre o Projeto
 
-O Termômetro da Economia Brasileira é um dashboard interativo que apresenta indicadores econômicos chave do Brasil, com foco especial em déficit primário e arrecadação de IOF. O sistema extrai dados automaticamente do Banco Central do Brasil (BCB) e do Instituto Brasileiro de Geografia e Estatística (IBGE), processa séries temporais e gera previsões utilizando modelos estatísticos avançados.
+Dashboard interativo simplificado para visualização e análise de indicadores econômicos brasileiros. Esta versão foi otimizada para carregamento rápido e facilidade de uso.
 
-### Principais Funcionalidades
+## Funcionalidades
 
-- **Extração Automática de Dados**: Coleta diária de indicadores do Banco Central do Brasil
-- **Previsão de Séries Temporais**: Modelos Prophet para previsão de até 24 meses
-- **Dashboard Interativo**: Visualização dinâmica de indicadores e previsões
-- **Análise de Correlação**: Estudo da relação entre diferentes indicadores
-- **Comparativo de Indicadores**: Visualização conjunta de múltiplos indicadores
+- **Visualização de Indicadores**: Gráficos interativos para 7 indicadores econômicos
+- **Análise Temporal**: Visualização de séries históricas e tendências
+- **Cache Simples**: Sistema de cache otimizado para performance
+- **Interface Responsiva**: Adaptável a diferentes dispositivos
+- **Configuração Simplificada**: Configurações essenciais via YAML
 
-## Estrutura do Projeto
+## Requisitos Mínimos
 
-```
-termometro-economia/
-├── .github/workflows/      # Workflows de automação
-├── assets/                 # Recursos estáticos (imagens, ícones)
-├── data/                   # Dados extraídos e processados
-├── docs/                   # Documentação adicional
-├── src/                    # Código-fonte
-│   ├── dados/              # Módulos de extração e processamento
-│   │   ├── extratores/     # Extratores de dados (BCB, IBGE)
-│   │   └── processadores/  # Processamento e previsão
-│   ├── utils/              # Utilitários e configurações
-│   └── visualizacao/       # Interface do usuário
-│       └── componentes/    # Componentes reutilizáveis
-├── .env.exemplo            # Exemplo de variáveis de ambiente
-├── docker-compose.yml      # Configuração Docker
-├── Dockerfile              # Configuração da imagem
-└── requirements.txt        # Dependências
+- Python 3.8 ou superior
+- Streamlit 1.28.0 ou superior
+- Pandas 2.0.0 ou superior
+- Plotly 5.15.0 ou superior
+
+## Instalação Rápida
+
+```bash
+# Extrair o projeto
+tar -xzf Projeto_MBA_Lite.tar.gz
+cd Projeto_MBA_Lite
+
+# Instalar dependências essenciais
+pip install -r requirements.txt
 ```
 
-## Requisitos
+## Execução
 
-- Python 3.11+
-- Docker e Docker Compose (para execução em contêineres)
-- Acesso à internet (para extração de dados do BCB)
+### Método 1: Scripts de Execução (Recomendado)
 
-## Instalação e Execução
+**Linux/Mac:**
+```bash
+./executar_dashboard.sh
+```
 
-### Usando Docker (Recomendado)
+**Windows:**
+```cmd
+executar_dashboard.bat
+```
 
-1. Clone o repositório:
-   ```bash
-   git clone https://github.com/seu-usuario/termometro-economia.git
-   cd termometro-economia
-   ```
+### Método 2: Execução Direta
 
-2. Configure as variáveis de ambiente:
-   ```bash
-   cp .env.exemplo .env
-   # Edite o arquivo .env conforme necessário
-   ```
+```bash
+streamlit run src/visualizacao/dashboard.py
+```
 
-3. Inicie os contêineres:
-   ```bash
-   docker-compose up -d
-   ```
+## Estrutura Simplificada
 
-4. Acesse o dashboard:
-   ```
-   http://localhost:8501
-   ```
+```
+Projeto_MBA_Lite/
+├── config/                  # Configurações essenciais
+│   └── dashboard_config.yaml
+├── data/                    # Dados econômicos
+│   ├── ipca.json
+│   ├── selic.json
+│   └── ...
+├── src/                     # Código-fonte
+│   ├── dados/               # Módulos de dados
+│   ├── utils/               # Utilitários essenciais
+│   └── visualizacao/        # Interface do usuário
+├── executar_dashboard.sh    # Script de execução (Linux/Mac)
+├── executar_dashboard.bat   # Script de execução (Windows)
+└── requirements.txt         # Dependências mínimas
+```
 
-### Instalação Local
+## Indicadores Disponíveis
 
-1. Clone o repositório:
-   ```bash
-   git clone https://github.com/marciolemosti/Projeto_MBA.git
-   cd Projeto_MBA
-   ```
+- **IPCA**: Índice de Preços ao Consumidor Amplo
+- **Taxa Selic**: Taxa básica de juros da economia
+- **Câmbio USD/BRL**: Taxa de câmbio Dólar/Real
+- **Déficit Primário**: Resultado primário do governo
+- **Arrecadação IOF**: Imposto sobre Operações Financeiras
+- **PIB (Amostra)**: Produto Interno Bruto - variação trimestral
+- **Desemprego (Amostra)**: Taxa de desocupação
 
-2. Crie e ative um ambiente virtual:
-   ```bash
-   python -m venv venv
-   source venv/bin/activate  # Linux/Mac
-   # ou
-   venv\Scripts\activate     # Windows
-   ```
+## Fontes de Dados
 
-3. Instale as dependências:
-   ```bash
-   pip install -r requirements.txt
-   ```
+- **IPCA, PIB, Desemprego**: IBGE (Instituto Brasileiro de Geografia e Estatística)
+- **Taxa Selic, Câmbio**: BCB (Banco Central do Brasil)
+- **Déficit Primário**: Tesouro Nacional / BCB
+- **Arrecadação IOF**: Receita Federal / BCB
 
-4. Configure as variáveis de ambiente:
-   ```bash
-   cp .env.exemplo .env
-   # Edite o arquivo .env conforme necessário
-   ```
+## Otimizações da Versão Lite
 
-5. Execute o dashboard:
-   ```bash
-   streamlit run src/visualizacao/dashboard.py
-   ```
+- ✅ **Carregamento mais rápido**: Remoção de módulos desnecessários
+- ✅ **Menor tamanho**: Sem testes automatizados
+- ✅ **Cache simplificado**: Sistema de cache leve e eficiente
+- ✅ **Dependências mínimas**: Apenas bibliotecas essenciais
+- ✅ **Configuração simplificada**: YAML enxuto e focado
 
-## Atualização Automática de Dados
+## Solução de Problemas
 
-O projeto está configurado para atualizar automaticamente os dados todos os dias à meia-noite (UTC) utilizando GitHub Actions. O workflow executa:
+### "No module named 'dados'"
+Execute sempre a partir do diretório raiz do projeto ou use os scripts fornecidos.
 
-1. Extração de dados do BCB
-2. Processamento e geração de previsões
-3. Commit e push das alterações para o repositório
+### "No module named 'streamlit'"
+```bash
+pip install streamlit
+```
 
-Para executar a atualização manualmente, você pode:
+### Porta 8501 em uso
+```bash
+streamlit run src/visualizacao/dashboard.py --server.port 8502
+```
 
-1. Acessar a aba "Actions" no GitHub
-2. Selecionar o workflow "Atualização Automática de Dados"
-3. Clicar em "Run workflow"
+## Desenvolvido por
 
-## Desenvolvimento
+**Márcio Lemos**  
+Projeto MBA - Termômetro da Economia Brasileira  
+Versão: 2.0 Lite
 
-### Estrutura de Módulos
-
-- **dados/extratores**: Contém classes e funções para extrair dados de fontes externas
-- **dados/processadores**: Implementa o processamento e previsão de séries temporais
-- **utils**: Utilitários como configuração e logging
-- **visualizacao/componentes**: Componentes reutilizáveis para o dashboard
-
-### Adicionando Novos Indicadores
-
-Para adicionar um novo indicador:
-
-1. Identifique o código da série no BCB (Sistema Gerenciador de Séries Temporais)
-2. Adicione o código e nome da série em `src/utils/configuracao.py` na seção `CONFIGURACAO_EXTRACAO`
-3. Configure a visualização do indicador na seção `CONFIGURACAO_VISUALIZACAO`
-
-### TCC MBA em Gestão Analítica com BI e Big Data - UNIFOR
-Desenvolvido por Márcio Lemos
-
-Universidade de Fortaleza - UNIFOR
-
-- Autor: Márcio José Lemos Garcia
-- Orientador: Professor Ms.Thiago Bluhm

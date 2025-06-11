@@ -11,7 +11,14 @@ import datetime
 import os
 import logging
 from typing import Dict, List, Optional, Union, Any
-from src.utils.configuracao import obter_configuracao
+
+# Importação opcional de configuração
+try:
+    from utils.configuracao import obter_configuracao
+except ImportError:
+    # Fallback se não houver configuração
+    def obter_configuracao(key, default=None):
+        return default
 
 # Configurar logger
 logger = logging.getLogger(__name__)
