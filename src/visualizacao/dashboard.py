@@ -4,7 +4,6 @@ Módulo principal do dashboard interativo de indicadores econômicos brasileiros
 Este módulo implementa o dashboard interativo com visualizações, filtros,
 comparações e projeções para indicadores econômicos brasileiros.
 """
-
 import os
 import sys
 import json
@@ -16,6 +15,18 @@ import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Union, Any, Tuple
+
+# Configuração de logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Configurar página
+st.set_page_config(
+    page_title="Dashboard de Indicadores Socioeconômicos Brasileiros",
+    page_icon="📊",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
 # Detectar e configurar caminhos automaticamente
 def setup_paths():
@@ -96,18 +107,6 @@ except ImportError as e:
     PrevisorSeriesTemporal = MockPrevisor
     
     st.warning("⚠️ Executando em modo de demonstração com dados mock")
-
-# Configuração de logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-# Configurar página
-st.set_page_config(
-    page_title="Dashboard de Indicadores Socioeconômicos Brasileiros",
-    page_icon="📊",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
 
 # Constantes
 DIRETORIO_DADOS = os.path.join(PROJETO_ROOT, "data")
@@ -434,30 +433,18 @@ def main():
                         <li><strong>IPCA, PIB, Desemprego:</strong> IBGE (Instituto Brasileiro de Geografia e Estatística)</li>
                         <li><strong>Taxa Selic, Câmbio:</strong> BCB (Banco Central do Brasil)</li>
                         <li><strong>Déficit Primário:</strong> Tesouro Nacional / BCB</li>
-                        <li><strong>Arrecadação IOF:</strong> Receita Federal / BCB</li>
+                        <li><strong>Arrecadação IOF:</strong> Receita Federal do Brasil</li>
                     </ul>
-                    
-                    <h4>Dados de Amostragem:</h4>
+                    <h4>Dados Simulados:</h4>
                     <ul>
-                        <li><strong>PIB (Amostra):</strong> Dados simulados baseados em padrões históricos</li>
-                        <li><strong>Desemprego (Amostra):</strong> Dados simulados baseados em padrões históricos</li>
+                        <li>Modelos de Previsão Estatística</li>
                     </ul>
-                    
-                    <h4>Metodologia:</h4>
-                    <ul>
-                        <li><strong>Projeções:</strong> Algoritmo Facebook Prophet</li>
-                        <li><strong>Cache:</strong> Sistema próprio para otimização</li>
-                        <li><strong>Visualizações:</strong> Plotly para gráficos interativos</li>
-                    </ul>
-                    
-                    <p><em>Disclaimer: Dados de amostragem são apenas para demonstração e não devem ser usados para decisões financeiras.</em></p>
                 </div>
             </details>
         </div>
-        """, 
+        """,
         unsafe_allow_html=True
     )
 
 if __name__ == "__main__":
     main()
-
