@@ -16,10 +16,6 @@ import plotly.graph_objects as go
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Union, Any, Tuple
 
-# Configuração de logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
 # Configurar página
 st.set_page_config(
     page_title="Dashboard de Indicadores Socioeconômicos Brasileiros",
